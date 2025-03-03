@@ -31,6 +31,7 @@ def process_mr(mr_files, hours_task_plan):
     results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
     total_hours_df = pd.DataFrame(columns=["Reference", "Name", "Hours in report header"])
     list_names, f4e_customer_ref = read_info_files(FOLDER)
+    hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
     for report in mr_files:
         if report.name.endswidth(".docx"):
             process_monthly(report)
