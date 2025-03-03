@@ -11,7 +11,7 @@ monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_fil
 
 if monthly_reports:
     file_extmytime = st.file_uploader("Upload hours")
-    if hours_extmytime:
+    if file_extmytime:
         process_mr(monthly_reports, file_extmytime)
         for report in monthly_reports:
             st.write(f"Filename {report.name}")
