@@ -28,16 +28,17 @@ MONTH_NUMBER_TO_NAME = {
 }
 
 results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
+list_names, f4e_customer_ref = read_info_files(FOLDER)
 
 def process_mr(mr_files, hours_task_plan):
     
     # results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
     # total_hours_df = pd.DataFrame(columns=["Reference", "Name", "Hours in report header"])
-    list_names, f4e_customer_ref = read_info_files(FOLDER)
+    
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
     for report in mr_files:
         if report.name.endswith(".docx"):
-            process_monthly(report, list_names, f4e_customer_ref, hours_task_plan)
+            process_monthly(report, hours_task_plan)
 
 
 def diff_month(d1, d2):
@@ -290,7 +291,7 @@ def check_customer_ref(header_data, name):
                             f"from the correct reference ({person_reference})"
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    return
+    return 
 
 
 def check_hours_report_vs_header(header_data, document):
@@ -596,7 +597,7 @@ def almost_equal(float_1, float_2):
     return math.isclose(float_1, float_2, rel_tol=0.0001)
 
 
-def process_monthly(filename, list_names, f4e_customer_ref, hours_task_plan):
+def process_monthly(filename, hours_task_plan):
     # Read list of employees
     list_employees = pd.read_excel("LIST OF EMPLOYEES.xlsx")
 
