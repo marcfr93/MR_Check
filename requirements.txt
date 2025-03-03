@@ -4,3 +4,4 @@ pandas
 pytest
 openpyxl
 docx2txt
+unidecode
