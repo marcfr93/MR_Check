@@ -607,7 +607,7 @@ def process_monthly(filename):
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
-    check_filename(filename, header_data)
+    check_filename(filename.name, header_data)
     # Get the different expressions of the name.
     name = get_names(list_names, filename)
     add_header_hours_to_list(header_data)  # Asked by Arnón, to get a file with all the hours
