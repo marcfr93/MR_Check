@@ -27,10 +27,12 @@ MONTH_NUMBER_TO_NAME = {
     12: "December",
 }
 
+results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
+
 def process_mr(mr_files, hours_task_plan):
     
-    results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
-    total_hours_df = pd.DataFrame(columns=["Reference", "Name", "Hours in report header"])
+    # results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
+    # total_hours_df = pd.DataFrame(columns=["Reference", "Name", "Hours in report header"])
     list_names, f4e_customer_ref = read_info_files(FOLDER)
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
     for report in mr_files:
@@ -610,7 +612,7 @@ def process_monthly(filename, list_names, f4e_customer_ref, hours_task_plan):
     check_filename(filename.name, header_data)
     # Get the different expressions of the name.
     name = get_names(list_names, filename.name)
-    add_header_hours_to_list(header_data)  # Asked by Arnón, to get a file with all the hours
+    # add_header_hours_to_list(header_data)  # Asked by Arnón, to get a file with all the hours
     # Shows revision number in the header
     show_version_message(header_data)
     # Checks if F4E contracts is the same in the name of the report and the header
