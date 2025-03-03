@@ -609,7 +609,7 @@ def process_monthly(filename):
     # Check if the name of the file follows correct structure
     check_filename(filename.name, header_data)
     # Get the different expressions of the name.
-    name = get_names(list_names, filename)
+    name = get_names(list_names, filename.name)
     add_header_hours_to_list(header_data)  # Asked by Arnón, to get a file with all the hours
     # Shows revision number in the header
     show_version_message(header_data)
