@@ -602,8 +602,8 @@ def process_monthly(filename):
     print(f"Analyzing {filename.name}...")
     f4e_contract = filename.name.split()[0]
     name_report = ' '.join(filename.name.split()[3:-3])
-    #document = docx2txt.process(filename)  # Get string of all document
-    document = docx.Document(filename)
+    document = docx2txt.process(filename)  # Get string of all document
+    #document = docx.Document(filename)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
