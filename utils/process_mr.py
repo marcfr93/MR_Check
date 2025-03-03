@@ -27,6 +27,24 @@ MONTH_NUMBER_TO_NAME = {
     12: "December",
 }
 
+def read_info_files(folder):
+
+    # Get file with list of names
+    list_names_file = Path("F4E-OMF-1159-01-01 List of Names - FINAL VERSION.xlsx")
+    try:
+        list_names = pd.read_excel(list_names_file, header=0)
+    except FileNotFoundError:
+        print(f" Could not find the list of names file {list_names_file}")
+
+    # Get files with F4E customer references
+    f4e_customer_ref_path = Path("F4E Customer Ref.xlsx")
+    try:
+        f4e_customer_ref = pd.read_excel(f4e_customer_ref_path, header=0)
+    except FileNotFoundError:
+        print(f" Could not find the file with the F4E Customer References")
+
+    return list_names, f4e_customer_ref
+
 results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
 list_names, f4e_customer_ref = read_info_files(FOLDER)
 
@@ -645,20 +663,4 @@ def process_monthly(filename, hours_task_plan):
     return
 
 
-def read_info_files(folder):
 
-    # Get file with list of names
-    list_names_file = Path("F4E-OMF-1159-01-01 List of Names - FINAL VERSION.xlsx")
-    try:
-        list_names = pd.read_excel(list_names_file, header=0)
-    except FileNotFoundError:
-        print(f" Could not find the list of names file {list_names_file}")
-
-    # Get files with F4E customer references
-    f4e_customer_ref_path = Path("F4E Customer Ref.xlsx")
-    try:
-        f4e_customer_ref = pd.read_excel(f4e_customer_ref_path, header=0)
-    except FileNotFoundError:
-        print(f" Could not find the file with the F4E Customer References")
-
-    return list_names, f4e_customer_ref
