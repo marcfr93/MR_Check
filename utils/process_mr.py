@@ -195,10 +195,10 @@ def check_f4e_contract(code_from_filename, header_data):
     return
 
 
-def check_supplier_dms(header_data, folder, name, list_employees):
+def check_supplier_dms(header_data, name, list_employees):
     """Check if the report of the month, year and person is in the Excel file 'DMS Number Monthly Report.xlsx' and
     also if the DMS number is correspondent"""
-    dms_data_file = Path(folder, "DMS Number Monthly Report.xlsx")
+    dms_data_file = Path("DMS Number Monthly Report.xlsx")
     try:
         dms_table = pd.read_excel(dms_data_file, header=0)
     except FileNotFoundError:
@@ -593,7 +593,7 @@ def almost_equal(float_1, float_2):
     return math.isclose(float_1, float_2, rel_tol=0.0001)
 
 
-def process_monthly(filename, folder):
+def process_monthly(filename):
     # Read list of employees
     list_employees = pd.read_excel("LIST OF EMPLOYEES.xlsx")
 
@@ -614,7 +614,7 @@ def process_monthly(filename, folder):
     # Checks if F4E contracts is the same in the name of the report and the header
     check_f4e_contract(f4e_contract, header_data)
     # Check if DMS in the header and in "DMS Number Monthly Report.xlsx" are the same
-    check_supplier_dms(header_data, folder, name, list_employees)
+    check_supplier_dms(header_data, name, list_employees)
     # Check if number of report (#) is coherent with months passed from KoM
     check_report_number_against_kom_date(header_data)
     # Check if the F4E reference is the same in header and external file
@@ -648,16 +648,7 @@ def read_info_files(folder):
         list_names = pd.read_excel(list_names_file, header=0)
     except FileNotFoundError:
         print(f" Could not find the list of names file {list_names_file}")
-    """
-    # Get file with hours in the task plan
-    hours_task_plan_path = Path(folder, "HoursTaskPlan.xlsx")
-    warnings.simplefilter("ignore")
-    try:
-        hours_task_plan = pd.read_excel(hours_task_plan_path, skiprows=3)
-    except FileNotFoundError:
-        print(f"  Could not find the file with the hours in ExtMyTime. It could not be checked if the number of "
-              f"hours in the header and in ExtMyTime are equal.")
-    """
+
     # Get files with F4E customer references
     f4e_customer_ref_path = Path("F4E Customer Ref.xlsx")
     try:
