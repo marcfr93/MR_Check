@@ -35,7 +35,7 @@ def process_mr(mr_files, hours_task_plan):
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
     for report in mr_files:
         if report.name.endswith(".docx"):
-            process_monthly(report)
+            process_monthly(report, list_names, f4e_customer_ref, hours_task_plan)
 
 
 def diff_month(d1, d2):
@@ -594,7 +594,7 @@ def almost_equal(float_1, float_2):
     return math.isclose(float_1, float_2, rel_tol=0.0001)
 
 
-def process_monthly(filename):
+def process_monthly(filename, list_names, f4e_customer_ref, hours_task_plan):
     # Read list of employees
     list_employees = pd.read_excel("LIST OF EMPLOYEES.xlsx")
 
