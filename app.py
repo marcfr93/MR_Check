@@ -14,8 +14,6 @@ if monthly_reports:
     file_extmytime = st.file_uploader("Upload hours")
     if file_extmytime:
         results = process_mr(monthly_reports, file_extmytime)
-        for report in monthly_reports:
-            st.write(f"Filename {report.name}")
         previous_name = ""
         for index, row in results.iterrows():
             if previous_name != row["Name"]:
