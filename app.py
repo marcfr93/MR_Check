@@ -18,7 +18,7 @@ if monthly_reports:
             st.write(f"Filename {report.name}")
         previous_name = ""
         for index, row in results.iterrows():
-            if previous_name != row["name"]:
+            if previous_name != row["Name"]:
                 st.write(f"{row["Reference"], row["Name"]}")
             st.write(f"    {row["Error"]}")
             
