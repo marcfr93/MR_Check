@@ -360,7 +360,7 @@ def check_hours_report_vs_header(header_data, document):
     return general_hours, general_taskplan, specific_taskplans_dic
 
 
-def check_hours_header_vs_ext_my_time(header_data, name):
+def check_hours_header_vs_ext_my_time(header_data, name, hours_task_plan):
     """Check if there are hours in ExtMyTime, the total hours match between ExtMyTime and the report, the general
     activities hours are not more than 8%, the general activities hours in ExtMyTime and the report match and if
     the specific hours in ExtMyTime and the report match."""
@@ -473,7 +473,7 @@ def get_codes_activities_section(document, start_text, end_text):
     return general_taskplan_code, specific_taskplans_codes
 
 
-def check_codes_sections(header_data, general_code, specific_codes, name, section):
+def check_codes_sections(header_data, general_code, specific_codes, name, section, hours_task_plan):
     """
     Checks if the codes of tasks in the text are the same as in the Excel file (Hours Task Plan)
 
@@ -645,15 +645,15 @@ def process_monthly(filename, hours_task_plan):
     check_customer_ref(header_data, name)
     # Check if the total number of hours in section 2.3 is the same as in the header
     general_hours_report, general_taskplan, specific_taskplans_dic = check_hours_report_vs_header(header_data, document)
-    check_hours_header_vs_ext_my_time(header_data, name)
+    check_hours_header_vs_ext_my_time(header_data, name, hours_task_plan)
     # Check if hours for each task plan is the same in the report and ExtMyTime
     check_tasks_hours_report_vs_ext_my_time(header_data, general_hours_report, general_taskplan, specific_taskplans_dic, hours_task_plan)
     # Get numerical code of tasks in sections 2.2 and 2.4
     general_code_22, specific_codes_22 = get_codes_activities_section(document, "definition for the period:", "during the period")
     general_code_24, specific_codes_24 = get_codes_activities_section(document, "for the next period:", "List of documents")
     # Check numerical Codes of tasks in sections 2.2 and 2.4
-    check_codes_sections(header_data, general_code_22, specific_codes_22, name, "2.2")
-    check_codes_sections(header_data, general_code_24, specific_codes_24, name, "2.4")
+    check_codes_sections(header_data, general_code_22, specific_codes_22, name, "2.2", hours_task_plan)
+    check_codes_sections(header_data, general_code_24, specific_codes_24, name, "2.4", hours_task_plan)
     # Check both dates in section 3 are the same
     check_dates_section3(document, header_data)
     # Check there are no "forbidden words" in the text
