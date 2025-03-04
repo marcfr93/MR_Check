@@ -1,5 +1,6 @@
 import streamlit as st
 from utils.process_mr import process_mr
+import pandas as pd
 #from utils.pre_process import pre_process
 #from utils.process_extmytime import process_extmytime
 
@@ -12,8 +13,11 @@ monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_fil
 if monthly_reports:
     file_extmytime = st.file_uploader("Upload hours")
     if file_extmytime:
-        process_mr(monthly_reports, file_extmytime)
+        results = process_mr(monthly_reports, file_extmytime)
         for report in monthly_reports:
             st.write(f"Filename {report.name}")
+        for index, row in results.iterrows():
+            st.write(row["Error"])
+            
             
 
