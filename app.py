@@ -16,8 +16,11 @@ if monthly_reports:
         results = process_mr(monthly_reports, file_extmytime)
         for report in monthly_reports:
             st.write(f"Filename {report.name}")
+        previous_name = ""
         for index, row in results.iterrows():
-            st.write(row["Error"])
+            if previous_name != row["name"]:
+                st.write(f"{row["reference"], row["name"]}")
+            st.write(f"    row["Error"]")
             
             
 
