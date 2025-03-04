@@ -1,8 +1,9 @@
 import streamlit as st
 from utils.process_mr import process_mr
 import pandas as pd
-#from utils.pre_process import pre_process
-#from utils.process_extmytime import process_extmytime
+
+# st.write(f"**Contract {row["Reference"]}, {row["Name"]}**")
+# st.markdown(f"- {row["Error"]} ")
 
 # Configure layout of page, must be first streamlit call in script
 st.set_page_config(layout="wide")
@@ -15,11 +16,15 @@ if monthly_reports:
     if file_extmytime:
         results = process_mr(monthly_reports, file_extmytime)
         previous_name = ""
+        text = ""
         for index, row in results.iterrows():
             if previous_name != row["Name"]:
                 previous_name = row["Name"]
-                st.write(f"**Contract {row["Reference"]}, {row["Name"]}**")
-            st.markdown(f"- {row["Error"]}")
+                text = text + f"**Contract {row["Reference"]}, {row["Name"]}** \n"
+                
+            text = text + f"- {row["Error"]} \n"
+            
+        st.markdown(text)
             
             
 
