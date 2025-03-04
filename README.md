@@ -1,2 +1,4 @@
 # MR_Check
-Monthly report check
+
+Check of the Monthly Reports before submission to CTS.
+Link to the app: https://mrcheck.streamlit.app/
