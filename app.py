@@ -20,7 +20,7 @@ if monthly_reports:
         for index, row in results.iterrows():
             if previous_name != row["Name"]:
                 previous_name = row["Name"]
-                text = text + f"**Contract {row["Reference"]}, {row["Name"]}** \n"
+                text = text + f"\n**Contract {row["Reference"]}, {row["Name"]}** \n"
                 
             text = text + f"- {row["Error"]} \n"
             
