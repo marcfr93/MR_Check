@@ -20,7 +20,7 @@ if monthly_reports:
         for index, row in results.iterrows():
             if previous_name != row["Name"]:
                 previous_name = row["Name"]
-                st.write(f"Contract {row["Reference"], row["Name"]}")
+                st.write(f"**Contract {row["Reference"]}, {row["Name"]}**")
             st.markdown(f"- {row["Error"]}")
             
             
