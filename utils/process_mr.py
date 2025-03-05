@@ -638,7 +638,7 @@ def check_months_header(document, header_data):
     return
 
 
-def check_encryption(mr):
+def check_encryption(mr, header_data):
     dms = mr.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).text
     try:
         token = mr.tables[KEY_ENCRYPTED["table"]].cell(*KEY_ENCRYPTED["cell"]).text
@@ -711,7 +711,7 @@ def process_monthly(filename, hours_task_plan):
     # Check months headers
     check_months_header(document, header_data)
     # Check encrypted key
-    check_encryption(document2)
+    check_encryption(document2, header_data)
     
     return
 
