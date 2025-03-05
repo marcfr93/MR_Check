@@ -638,7 +638,8 @@ def check_months_header(document, header_data):
     return
 
 
-def check_encryption(mr, dms):
+def check_encryption(mr):
+    dms = mr.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).text
     try:
         token = mr.tables[KEY_ENCRYPTED["table"]].cell(*KEY_ENCRYPTED["cell"]).text
     except IndexError:
@@ -709,9 +710,8 @@ def process_monthly(filename, hours_task_plan):
     forbidden_words(document, header_data)
     # Check months headers
     check_months_header(document, header_data)
-    document
     # Check encrypted key
-    check_encryption(document2, dms)
+    check_encryption(document2)
     
     return
 
