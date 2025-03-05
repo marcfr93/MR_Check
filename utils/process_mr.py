@@ -640,7 +640,7 @@ def check_months_header(document, header_data):
 
 def check_encryption(mr, dms):
     try:
-        token = mr.tables[KEY_ENCRYPTED["table"]].cell(*KEY_ENCRYPTED["cell"])).text
+        token = mr.tables[KEY_ENCRYPTED["table"]].cell(*KEY_ENCRYPTED["cell"]).text
     except IndexError:
         error_message = f"  Could not access the ecnrypted key in Section 3, probably the pre-processing " \
                         f"tool was not used."
