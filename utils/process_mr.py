@@ -9,7 +9,7 @@ import pandas as pd
 import math
 from unidecode import unidecode
 import time
-from cryptograhy.fernet import Fernet
+from cryptography.fernet import Fernet
 
 # PARAMETERS
 REPORT_NUMBER = {"table": 0, "cell": (0, 2)}
