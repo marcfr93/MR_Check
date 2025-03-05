@@ -9,7 +9,31 @@ import pandas as pd
 import math
 from unidecode import unidecode
 import time
+from cryptograhy.fernet import Fernet
 
+# PARAMETERS
+REPORT_NUMBER = {"table": 0, "cell": (0, 2)}
+DMS_CELL = {"table": 0, "cell": (2, 2)}
+H_IN_PERIOD_CELL = {"table": 1, "cell": (1, 3)}
+PERIODS = [
+    {"table": 2, "cell": (0, 1)},
+    {"table": 3, "cell": (0, 1)},
+    {"table": 4, "cell": (0, 1)},
+]
+AUTHOR_NAME = {"table": 6, "cell": (1, 0)}
+DATE_AUTHOR = {"table": 6, "cell": (2, 0)}
+DATE_APPROVAL = {"table": 6, "cell": (2, 1)}
+NEW_MILESTONE = {"table": 2, "cell": (1, 1)}
+MILESTONE_TO_COPY = {"table": 4, "cell": (1, 1)}
+TOTAL_HOURS = {"table": 1, "cell": (1, 3)}
+SECTION3 = {"table": 3, "cell": (1, 1)}
+TO_HIGHLIGHT = [
+    SECTION3,
+    {"table": 5, "cell": (1, 1)},
+    MILESTONE_TO_COPY,
+]
+KEY_ENCRYPTED = {"table": 6, "cell": (3, 0)}
+KEY_ENCRYPTED_SIDE = {"table": 6, "cell": (3, 1)}
 
 FOLDER = "test_data"
 MONTH_NUMBER_TO_NAME = {
@@ -614,6 +638,29 @@ def check_months_header(document, header_data):
     return
 
 
+def check_encryption(mr, dms):
+    try:
+        token = mr.tables[KEY_ENCRYPTED["table"]].cell(*KEY_ENCRYPTED["cell"])).text
+    except IndexError:
+        error_message = f"  Could not access the ecnrypted key in Section 3, probably the pre-processing " \
+                        f"tool was not used."
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+        return
+    dms_decoded = decode_token(token)
+    if dms != dms_decoded:
+        error_message = f"  The DMS does not correspond to the encrypted key, the pre-processing tool " \
+                        f"was not used."
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    return
+
+
+def decode_token(token):
+    key = b'XHHzTu2MlETGr1Dy3ltNATwnsuCCaZqgGCp0Dkw0HB4='
+    f = Fernet(key)
+    dms = f.decrypt(token.encode('utf-8'))
+    return dms.decode('utf-8')
+    
+    
 def almost_equal(float_1, float_2):
     return math.isclose(float_1, float_2, rel_tol=0.0001)
 
@@ -627,7 +674,7 @@ def process_monthly(filename, hours_task_plan):
     f4e_contract = filename.name.split()[0]
     name_report = ' '.join(filename.name.split()[3:-3])
     document = docx2txt.process(filename)  # Get string of all document
-    #document = docx.Document(filename)
+    document2 = docx.Document(filename)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
@@ -660,9 +707,12 @@ def process_monthly(filename, hours_task_plan):
     check_dates_section3(document, header_data)
     # Check there are no "forbidden words" in the text
     forbidden_words(document, header_data)
-
-    #Check months headers
+    # Check months headers
     check_months_header(document, header_data)
+    document
+    # Check encrypted key
+    check_encryption(document2, dms)
+    
     return
 
 
