@@ -5,3 +5,4 @@ pytest
 openpyxl
 docx2txt
 unidecode
+cryptography
