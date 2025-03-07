@@ -16,14 +16,15 @@ REPORT_NUMBER = {"table": 0, "cell": (0, 2)}
 DMS_CELL = {"table": 0, "cell": (2, 2)}
 H_IN_PERIOD_CELL = {"table": 1, "cell": (1, 3)}
 PERIODS = [
-    {"table": 2, "cell": (0, 1)},
-    {"table": 3, "cell": (0, 1)},
-    {"table": 4, "cell": (0, 1)},
+    {"table": 2, "cell": (0, 1), "section": "2.2"},
+    {"table": 3, "cell": (0, 1), "section": "2.3"},
+    {"table": 4, "cell": (0, 1), "section": "2.4"},
 ]
 AUTHOR_NAME = {"table": 6, "cell": (1, 0)}
 DATE_AUTHOR = {"table": 6, "cell": (2, 0)}
 DATE_APPROVAL = {"table": 6, "cell": (2, 1)}
 NEW_MILESTONE = {"table": 2, "cell": (1, 1)}
+CURRENT_MILESTONE = {"table": 3, "cell": (1, 1)}
 MILESTONE_TO_COPY = {"table": 4, "cell": (1, 1)}
 TOTAL_HOURS = {"table": 1, "cell": (1, 3)}
 SECTION3 = {"table": 3, "cell": (1, 1)}
@@ -596,22 +597,43 @@ def check_dates_section3(document, header_data):
 
     return
 
+def check_text_forbidden_words(text: str, header_data)
+    forbidden = ["F4E Project Manager", "F4E Manager", "F4E Line Manager"]
+    for word in forbidden:
+        if word.lower() in text.lower():
+            error_message = f"  The expression '{word}' appears in the body of the document, please delete it."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    return
 
 def forbidden_words(document, header_data):
-
+    sections = [NEW_MILESTONE, CURRENT_MILESTONE, MILESTONE_TO_COPY]
+    for section in sections:
+        check_text_forbidden_words(document.tables[section["table"]].cell(section["cell"]).text
+    """
     forbidden = ["F4E Project Manager", "F4E Manager", "F4E Line Manager"]
     for word in forbidden:
         if word.lower() in document.lower():
             error_message = f"  The expression '{word}' appears in the body of the document, please delete it."
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-
+    """
     return
-
+    
 
 def check_months_header(document, header_data):
     month = header_data.report_number.split('_')[1]
 
+    for period in PERIODS
+        line = document.tables[period["table"]].cell(period["cell"]).text
+        if period["table"] == 4:
+            month = int(month[1:]) % 12 + 1
+            month = f"M{next_month:02}"
+        if month not in line:
+            error_message = f"  The month in the header of Section {period["section"]} is not valid."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    """
     start = re.search("Tasks and milestones definition for the period", document).span()[0]
     line = document[start:].split('\n')[0]
     if month not in line:
@@ -634,7 +656,7 @@ def check_months_header(document, header_data):
         error_message = f"  The month in the header of Section 2.4 is not valid."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-
+    """
     return
 
 
@@ -707,9 +729,9 @@ def process_monthly(filename, hours_task_plan):
     # Check both dates in section 3 are the same
     check_dates_section3(document, header_data)
     # Check there are no "forbidden words" in the text
-    forbidden_words(document, header_data)
+    forbidden_words(document2, header_data)
     # Check months headers
-    check_months_header(document, header_data)
+    check_months_header(document2, header_data)
     # Check encrypted key
     check_encryption(document2, header_data)
     
