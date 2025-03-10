@@ -59,14 +59,14 @@ MONTH_NUMBER_TO_NAME = {
 def read_info_files(folder):
 
     # Get file with list of names
-    list_names_file = Path(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\F4E-OMF-1159-01-01 List of Names - FINAL VERSION.xlsx")
+    list_names_file = Path(r"F4E-OMF-1159-01-01 List of Names - FINAL VERSION.xlsx")
     try:
         list_names = pd.read_excel(list_names_file, header=0)
     except FileNotFoundError:
         print(f" Could not find the list of names file {list_names_file}")
 
     # Get files with F4E customer references
-    f4e_customer_ref_path = Path(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils","F4E Customer Ref.xlsx")
+    f4e_customer_ref_path = Path(r"F4E Customer Ref.xlsx")
     try:
         f4e_customer_ref = pd.read_excel(f4e_customer_ref_path, header=0)
     except FileNotFoundError:
@@ -648,23 +648,19 @@ def almost_equal(float_1, float_2):
 
 def process_monthly(filename, hours_task_plan):
     # Read list of employees
-    list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
-    name_file = "F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"
+    list_employees = pd.read_excel(r"LIST OF EMPLOYEES.xlsx")
+    
     global name_report
     #print(f"Analyzing {filename.name}...")
-    #f4e_contract = filename.name.split()[0]
-    f4e_contract = name_file.split()[0]
-    #name_report = ' '.join(filename.name.split()[3:-3])
-    name_report = " ".join(name_file.split()[3:-3])
+    f4e_contract = filename.name.split()[0]
+    name_report = ' '.join(filename.name.split()[3:-3])
     document = docx.Document(filename)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
-    #check_filename(filename.name, header_data)
-    check_filename(name_file, header_data)
+    check_filename(filename.name, header_data)
     # Get the different expressions of the name.
-    #name = get_names(list_names, filename.name)
-    name = get_names(list_names, name_file)
+    name = get_names(list_names, filename.name)
     # add_header_hours_to_list(header_data)  # Asked by Arnón, to get a file with all the hours
     # Shows revision number in the header
     show_version_message(header_data)
@@ -694,9 +690,3 @@ def process_monthly(filename, hours_task_plan):
     check_encryption(document, header_data)
     
     return
-
-
-if __name__ == "__main__":
-    mr_files = [r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"]
-    hours_task_plan = r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\HoursTaskPlan.xlsx"
-    process_mr(mr_files, hours_task_plan)
