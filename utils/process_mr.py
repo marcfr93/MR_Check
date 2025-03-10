@@ -13,7 +13,11 @@ from cryptography.fernet import Fernet
 
 # PARAMETERS
 REPORT_NUMBER = {"table": 0, "cell": (0, 2)}
+VERSION = {"table": 0, "cell": (0, 4)}
+F4E_REFERENCE = {"table": 0, "cell": (1, 2)}
+CUSTOMER_REF = {"table": 0, "cell": (1, 4)}
 DMS_CELL = {"table": 0, "cell": (2, 2)}
+KOM_DATE = {"table": 1, "cell": (1, 1)}
 H_IN_PERIOD_CELL = {"table": 1, "cell": (1, 3)}
 PERIODS = [
     {"table": 2, "cell": (0, 1), "section": "2.2"},
@@ -55,14 +59,14 @@ MONTH_NUMBER_TO_NAME = {
 def read_info_files(folder):
 
     # Get file with list of names
-    list_names_file = Path("F4E-OMF-1159-01-01 List of Names - FINAL VERSION.xlsx")
+    list_names_file = Path(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\F4E-OMF-1159-01-01 List of Names - FINAL VERSION.xlsx")
     try:
         list_names = pd.read_excel(list_names_file, header=0)
     except FileNotFoundError:
         print(f" Could not find the list of names file {list_names_file}")
 
     # Get files with F4E customer references
-    f4e_customer_ref_path = Path("F4E Customer Ref.xlsx")
+    f4e_customer_ref_path = Path(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils","F4E Customer Ref.xlsx")
     try:
         f4e_customer_ref = pd.read_excel(f4e_customer_ref_path, header=0)
     except FileNotFoundError:
@@ -81,8 +85,8 @@ def process_mr(mr_files, hours_task_plan):
     
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
     for report in mr_files:
-        if report.name.endswith(".docx"):
-            process_monthly(report, hours_task_plan)
+        #if report.name.endswith(".docx"):
+        process_monthly(report, hours_task_plan)
 
     return results_df
 
@@ -166,29 +170,18 @@ def read_header(document):
         HeaderData class
     """
     header_data = HeaderData()
-    end = re.search("Tasks and milestones", document).span()[0]
-    lines = list(filter(None, document[:end].splitlines()))
-    for i, line in enumerate(lines):
-        if "Report Number:" in line:
-            header_data.report_number = lines[i + 1].strip()
-        elif "Revision:" in line:
-            header_data.version = lines[i + 1].strip()
-        elif "F4E reference:" in line:
-            header_data.f4e_reference = lines[i + 1].strip()
-        elif "F4E Customer ref:" in line:
-            header_data.customer_ref = lines[i + 1].strip()
-        elif "Supplier DMS#:" in line:
-            header_data.supplier_dms = lines[i + 1].strip()
-        elif "KOM Date" in line:
-            header_data.kom_date = lines[i + 1].strip()
-        elif "Hours implemented in the period" in line:
-            to_be_replaced = [" ", "(", "*", ")"]
-            hours = lines[i + 1].strip().replace(",", ".")
-            for j in to_be_replaced:
-                hours = hours.replace(j, "")
-            header_data.reported_hours = hours
-        if header_data.totally_filled:
-            break
+    header_data.report_number = document.tables[REPORT_NUMBER["table"]].cell(*REPORT_NUMBER["cell"]).text.strip()
+    header_data.version = document.tables[VERSION["table"]].cell(*VERSION["cell"]).text.strip()
+    header_data.f4e_reference = document.tables[F4E_REFERENCE["table"]].cell(*F4E_REFERENCE["cell"]).text.strip()
+    header_data.customer_ref = document.tables[CUSTOMER_REF["table"]].cell(*CUSTOMER_REF["cell"]).text.strip()
+    header_data.supplier_dms = document.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).text.strip()
+    header_data.kom_date = document.tables[KOM_DATE["table"]].cell(*KOM_DATE["cell"]).text.strip()
+    hours = document.tables[H_IN_PERIOD_CELL["table"]].cell(*H_IN_PERIOD_CELL["cell"]).text.strip()
+    to_be_replaced = [" ", "(", "*", ")"]
+    for symbol in to_be_replaced:
+        hours = hours.replace(symbol, "")
+    header_data.reported_hours = hours
+    
     if not header_data.totally_filled:
         error_message = f"  The monthly header was not successfully read {header_data}"
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
@@ -248,7 +241,7 @@ def check_f4e_contract(code_from_filename, header_data):
 def check_supplier_dms(header_data, name, list_employees):
     """Check if the report of the month, year and person is in the Excel file 'DMS Number Monthly Report.xlsx' and
     also if the DMS number is correspondent"""
-    dms_data_file = Path("DMS Number Monthly Report.xlsx")
+    dms_data_file = Path(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\DMS Number Monthly Report.xlsx")
     try:
         dms_table = pd.read_excel(dms_data_file, header=0)
     except FileNotFoundError:
@@ -272,11 +265,11 @@ def check_supplier_dms(header_data, name, list_employees):
     # Transform the name using the file with the list of names and their equivalents
     string_dms = f'^(?=.*{year})(?=.*{month})(?=.*{unidecode(name.irs)})|^(?=.*{year})(?=.*{month})(?=.*{unidecode(name.report)})'
     dms_table = dms_table[dms_table["Description"].apply(unidecode).str.contains(string_dms)]
-    """
-    person = list_employees[list_employees["Name Monthly/Mission"].apply(unidecode) == name.report]
+    
+    person = list_employees[list_employees["Name Monthly/Mission"] == name.report]
     dms = person[f"{month} {year}"]
     if not pd.isna(dms.values[0]):
-        dms_code = dms_table["Reference"].values[0]
+        dms_code = dms.values[0]
         if dms_code != header_data.supplier_dms:
             error_message = f"  DMS from database ({dms_code}) does not match DMS from " \
                             f"header ({header_data.supplier_dms}). Check the DMS number and the month number in the " \
@@ -284,9 +277,9 @@ def check_supplier_dms(header_data, name, list_employees):
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     else:
-        error_message = f"  The DMS reference could not be found for the year {year}, month {month}, and name" \
-                        f"{name.irs}. It could be that it is not in the list or that any of these parameters is " \
-                        f"written incorrectly. It could not be checked if the DMS number is correct."
+        error_message = f"  The DMS reference could not be found for {month} {year} for {name.irs}. It could be that " \
+                        f"it is not in the list or that any of these parameters is written incorrectly. " \
+                        f"It could not be checked if the DMS number is correct."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
@@ -305,7 +298,7 @@ def check_supplier_dms(header_data, name, list_employees):
                         f"written incorrectly. It could not be checked if the DMS number is correct."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-
+    """
     return
 
 
@@ -348,9 +341,7 @@ def check_hours_report_vs_header(header_data, document):
     general_taskplan = ""
     specific_taskplans_dic = {}
     # Get the part of the part of the text where the reported hours are
-    start = re.search("Main results, achievements and issues encountered during the period:", document).span()[1]
-    end = re.search("Main scheduled tasks and milestones for the next period", document).span()[0]
-    section = document[start:end]
+    section = document.tables[CURRENT_MILESTONE["table"]].cell(*CURRENT_MILESTONE["cell"]).text
 
     # Get the hours done in the period for each task
     while True:
@@ -465,7 +456,7 @@ def check_tasks_hours_report_vs_ext_my_time(header_data, general_hours_report, g
     return
 
 
-def get_codes_activities_section(document, start_text, end_text):
+def get_codes_activities_section(document, cell_ref):
     """
     Gets the numeric codes of the general task and the specific tasks in a section of the text.
 
@@ -481,9 +472,7 @@ def get_codes_activities_section(document, start_text, end_text):
     general_taskplan_code = ""
     specific_taskplans_codes = []
     # Trim the text to only the wanted part
-    start = re.search(start_text, document).span()[1]
-    end = re.search(end_text, document).span()[0]
-    section = document[start:end]
+    section = document.tables[cell_ref["table"]].cell(*cell_ref["cell"]).text
 
     while True:
         try:
@@ -500,7 +489,7 @@ def get_codes_activities_section(document, start_text, end_text):
     return general_taskplan_code, specific_taskplans_codes
 
 
-def check_codes_sections(header_data, general_code, specific_codes, name, section, hours_task_plan):
+def check_codes_sections(header_data, name, section, hours_task_plan, document, cell_ref):
     """
     Checks if the codes of tasks in the text are the same as in the Excel file (Hours Task Plan)
 
@@ -512,6 +501,7 @@ def check_codes_sections(header_data, general_code, specific_codes, name, sectio
         name (class): configurations of the person's name
         section (str): number of section in the document
     """
+    general_code, specific_codes = get_codes_activities_section(document, cell_ref)
 
     hours_person = hours_task_plan[hours_task_plan["Full Name"].apply(unidecode).isin([name.irs_comma, name.irs, name.report])]
     if len(hours_person) == 0:
@@ -556,15 +546,12 @@ def check_filename(filename, header_data):
 
 
 def check_dates_section3(document, header_data):
-    # Go to Section 3 part of the text
-    start = re.search("Section 3", document).span()[1]
-    section = document[start:]
 
-    first_date_start = re.search("Date: ", section).span()[1]
-    first_date = section[first_date_start:].split()[0]
-    second_date = section[first_date_start:].split()[2]
-    if first_date != second_date:
-        error_message = f"  The dates in Section 3 are not the same({first_date} vs {second_date})."
+    date_author = document.tables[DATE_AUTHOR["table"]].cell(*DATE_AUTHOR["cell"]).text
+    date_approval = document.tables[DATE_APPROVAL["table"]].cell(*DATE_APPROVAL["cell"]).text
+   
+    if date_author != date_approval:
+        error_message = f"  The dates in Section 3 are not the same({date_author} vs {date_approval})."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
@@ -575,7 +562,8 @@ def check_dates_section3(document, header_data):
     year_header = re.match(r"#\d+_M\d+_(\d+)", header_data.report_number).group(1)  # eg."2022"
     year_header = int(year_header)
 
-    date = first_date.split('/')
+    date_author = date_author.replace("Date: ", "")
+    date = date_author.split('/')
     month_section3 = int(date[1])
     day_section3 = int(date[0])
     year_section3 = int(date[2])
@@ -597,7 +585,7 @@ def check_dates_section3(document, header_data):
 
     return
 
-def check_text_forbidden_words(text: str, header_data)
+def check_text_forbidden_words(text: str, header_data):
     forbidden = ["F4E Project Manager", "F4E Manager", "F4E Line Manager"]
     for word in forbidden:
         if word.lower() in text.lower():
@@ -609,54 +597,24 @@ def check_text_forbidden_words(text: str, header_data)
 def forbidden_words(document, header_data):
     sections = [NEW_MILESTONE, CURRENT_MILESTONE, MILESTONE_TO_COPY]
     for section in sections:
-        check_text_forbidden_words(document.tables[section["table"]].cell(section["cell"]).text
-    """
-    forbidden = ["F4E Project Manager", "F4E Manager", "F4E Line Manager"]
-    for word in forbidden:
-        if word.lower() in document.lower():
-            error_message = f"  The expression '{word}' appears in the body of the document, please delete it."
-            print(error_message)
-            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    """
+        check_text_forbidden_words(document.tables[section["table"]].cell(*section["cell"]).text, header_data)
+
     return
     
 
 def check_months_header(document, header_data):
     month = header_data.report_number.split('_')[1]
 
-    for period in PERIODS
-        line = document.tables[period["table"]].cell(period["cell"]).text
+    for period in PERIODS:
+        line = document.tables[period["table"]].cell(*period["cell"]).text
         if period["table"] == 4:
-            month = int(month[1:]) % 12 + 1
+            next_month = int(month[1:]) % 12 + 1
             month = f"M{next_month:02}"
         if month not in line:
-            error_message = f"  The month in the header of Section {period["section"]} is not valid."
+            error_message = f"  The month in the header of Section {period['section']} is not valid."
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    """
-    start = re.search("Tasks and milestones definition for the period", document).span()[0]
-    line = document[start:].split('\n')[0]
-    if month not in line:
-        error_message = f"  The month in the header of Section 2.2 is not valid."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-
-    start = re.search("Main results, achievements and issues encountered during the period", document).span()[0]
-    line = document[start:].split('\n')[0]
-    if month not in line:
-        error_message = f"  The month in the header of Section 2.3 is not valid."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-
-    next_month = int(month[1:]) % 12 + 1
-    next_month = f"M{next_month:02}"
-    start = re.search("Main scheduled tasks and milestones for the next period", document).span()[0]
-    line = document[start:].split('\n')[0]
-    if next_month not in line:
-        error_message = f"  The month in the header of Section 2.4 is not valid."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    """
+    
     return
 
 
@@ -690,20 +648,23 @@ def almost_equal(float_1, float_2):
 
 def process_monthly(filename, hours_task_plan):
     # Read list of employees
-    list_employees = pd.read_excel("LIST OF EMPLOYEES.xlsx")
-
+    list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
+    name_file = "F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"
     global name_report
-    print(f"Analyzing {filename.name}...")
-    f4e_contract = filename.name.split()[0]
-    name_report = ' '.join(filename.name.split()[3:-3])
-    document = docx2txt.process(filename)  # Get string of all document
-    document2 = docx.Document(filename)
+    #print(f"Analyzing {filename.name}...")
+    #f4e_contract = filename.name.split()[0]
+    f4e_contract = name_file.split()[0]
+    #name_report = ' '.join(filename.name.split()[3:-3])
+    name_report = " ".join(name_file.split()[3:-3])
+    document = docx.Document(filename)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
-    check_filename(filename.name, header_data)
+    #check_filename(filename.name, header_data)
+    check_filename(name_file, header_data)
     # Get the different expressions of the name.
-    name = get_names(list_names, filename.name)
+    #name = get_names(list_names, filename.name)
+    name = get_names(list_names, name_file)
     # add_header_hours_to_list(header_data)  # Asked by Arnón, to get a file with all the hours
     # Shows revision number in the header
     show_version_message(header_data)
@@ -720,22 +681,22 @@ def process_monthly(filename, hours_task_plan):
     check_hours_header_vs_ext_my_time(header_data, name, hours_task_plan)
     # Check if hours for each task plan is the same in the report and ExtMyTime
     check_tasks_hours_report_vs_ext_my_time(header_data, general_hours_report, general_taskplan, specific_taskplans_dic, hours_task_plan)
-    # Get numerical code of tasks in sections 2.2 and 2.4
-    general_code_22, specific_codes_22 = get_codes_activities_section(document, "definition for the period:", "during the period")
-    general_code_24, specific_codes_24 = get_codes_activities_section(document, "for the next period:", "List of documents")
     # Check numerical Codes of tasks in sections 2.2 and 2.4
-    check_codes_sections(header_data, general_code_22, specific_codes_22, name, "2.2", hours_task_plan)
-    check_codes_sections(header_data, general_code_24, specific_codes_24, name, "2.4", hours_task_plan)
+    check_codes_sections(header_data, name, "2.2", hours_task_plan, document, NEW_MILESTONE)
+    check_codes_sections(header_data, name, "2.4", hours_task_plan, document, MILESTONE_TO_COPY)
     # Check both dates in section 3 are the same
     check_dates_section3(document, header_data)
     # Check there are no "forbidden words" in the text
-    forbidden_words(document2, header_data)
+    forbidden_words(document, header_data)
     # Check months headers
-    check_months_header(document2, header_data)
+    check_months_header(document, header_data)
     # Check encrypted key
-    check_encryption(document2, header_data)
+    check_encryption(document, header_data)
     
     return
 
 
-
+if __name__ == "__main__":
+    mr_files = [r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"]
+    hours_task_plan = r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\HoursTaskPlan.xlsx"
+    process_mr(mr_files, hours_task_plan)
