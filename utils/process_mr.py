@@ -3,7 +3,6 @@ import re
 from datetime import datetime
 from pathlib import Path
 import warnings
-import docx2txt
 import docx
 import pandas as pd
 import math
@@ -56,27 +55,9 @@ MONTH_NUMBER_TO_NAME = {
     12: "December",
 }
 
-def read_info_files(folder):
-
-    # Get file with list of names
-    list_names_file = Path(r"F4E-OMF-1159-01-01 List of Names - FINAL VERSION.xlsx")
-    try:
-        list_names = pd.read_excel(list_names_file, header=0)
-    except FileNotFoundError:
-        print(f" Could not find the list of names file {list_names_file}")
-
-    # Get files with F4E customer references
-    f4e_customer_ref_path = Path(r"F4E Customer Ref.xlsx")
-    try:
-        f4e_customer_ref = pd.read_excel(f4e_customer_ref_path, header=0)
-    except FileNotFoundError:
-        print(f" Could not find the file with the F4E Customer References")
-
-    return list_names, f4e_customer_ref
-
 results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
-list_names, f4e_customer_ref = read_info_files(FOLDER)
 global hours_task_plan
+#global list_employees
 
 def process_mr(mr_files, hours_task_plan):
     
@@ -84,6 +65,7 @@ def process_mr(mr_files, hours_task_plan):
     # total_hours_df = pd.DataFrame(columns=["Reference", "Name", "Hours in report header"])
     
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
+    #list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
     for report in mr_files:
         #if report.name.endswith(".docx"):
         process_monthly(report, hours_task_plan)
@@ -140,7 +122,7 @@ Customer Ref.: {self.customer_ref}"""
 
 class Name:
     """
-    A class to represent the different configuration of a person's name
+    A class to represent the different configurations of a person's name
 
     Attributes
     ---
@@ -153,10 +135,14 @@ class Name:
         self.irs = None
         self.irs_comma = None
 
-    def convert(self, list_names):
-        self.irs_comma = unidecode(list_names[list_names["Monthly/Mission Request"].apply(unidecode) == unidecode(self.report)]["IRS"].values[0])
+    def convert(self, list_employees):
+        person = list_employees[list_employees["Name Monthly/Mission"].astype(str).apply(unidecode) == unidecode(self.report)]
+        self.irs_comma = unidecode(person["Name IRS"].values[0])
         name_irs = self.irs_comma.split(", ")
-        self.irs = unidecode(name_irs[1] + " " + name_irs[0])
+        self.irs = f"{name_irs[1]} {name_irs[0]}"
+        #self.irs_comma = unidecode(list_names[list_names["Monthly/Mission Request"].apply(unidecode) == unidecode(self.report)]["IRS"].values[0])
+        #name_irs = self.irs_comma.split(", ")
+        #self.irs = unidecode(name_irs[1] + " " + name_irs[0])
 
 
 def read_header(document):
@@ -211,7 +197,7 @@ def show_version_message(header_data):
     return
 
 
-def get_names(list_names, filename):
+def get_names(filename, list_employees):
     """
     Initializes class name, reads the name in the title of the report and converts it to the other two formats.
 
@@ -223,7 +209,7 @@ def get_names(list_names, filename):
     """
     name = Name()
     name.report = unidecode(re.match(r".+ Monthly Report (.+\s.+) #", filename).group(1))
-    name.convert(list_names)
+    name.convert(list_employees)
 
     return name
 
@@ -255,18 +241,15 @@ def check_supplier_dms(header_data, name, list_employees):
     # Get year from report number in header
     year = re.match(r"#\d+_M\d+_(\d+)", header_data.report_number).group(1)  # eg."2022"
     # Get name from filename
-
     if name.irs is None:
         error_message = f"  The name '{name.report}' could not be found in the file with the list of names under the " \
                         f"column named 'Monthly/Mission request'. The DMS number could not be checked."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
         return
-    # Transform the name using the file with the list of names and their equivalents
-    string_dms = f'^(?=.*{year})(?=.*{month})(?=.*{unidecode(name.irs)})|^(?=.*{year})(?=.*{month})(?=.*{unidecode(name.report)})'
-    dms_table = dms_table[dms_table["Description"].apply(unidecode).str.contains(string_dms)]
     
-    person = list_employees[list_employees["Name Monthly/Mission"] == name.report]
+    # Search DMS and compare to report
+    person = list_employees[list_employees["Name Monthly/Mission"].astype(str).apply(unidecode) == name.report]
     dms = person[f"{month} {year}"]
     if not pd.isna(dms.values[0]):
         dms_code = dms.values[0]
@@ -282,23 +265,6 @@ def check_supplier_dms(header_data, name, list_employees):
                         f"It could not be checked if the DMS number is correct."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-
-    """
-    if len(dms_table) > 0:
-        dms_code = dms_table["Reference"].values[0]
-        if dms_code != header_data.supplier_dms:
-            error_message = f"  DMS from database ({dms_code}) does not match DMS from " \
-                            f"header ({header_data.supplier_dms}). Check the DMS number and the month number in the " \
-                            f"report."
-            print(error_message)
-            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    else:
-        error_message = f"  The DMS reference could not be found for the year {year}, month {month}, and name" \
-                        f"{name.irs}. It could be that it is not in the list or that any of these parameters is " \
-                        f"written incorrectly. It could not be checked if the DMS number is correct."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    """
     return
 
 
@@ -321,15 +287,20 @@ def check_report_number_against_kom_date(header_data):
     return
 
 
-def check_customer_ref(header_data, name):
+def check_customer_ref(header_data, name, list_employees):
 
-    person_reference = f4e_customer_ref.loc[f4e_customer_ref["ESP"].apply(unidecode).isin([name.irs, name.report]), "F4E Customer Reference"].iloc[0]
-    if len(person_reference) > 4:
-        if header_data.customer_ref != person_reference:
+    customer_ref_list = list_employees.loc[list_employees["Name Monthly/Mission"].astype(str).apply(unidecode) == name.report, "F4E Customer Ref"].values[0]
+
+    if not pd.isna(customer_ref_list):
+        if customer_ref_list != header_data.customer_ref:
             error_message = f"  The F4E Customer Reference in the report ({header_data.customer_ref}) is different" \
-                            f"from the correct reference ({person_reference})"
+                            f"from the correct reference ({customer_ref_list})"
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    else:
+        error_message = f"  Could not find a F4E Customer Reference in the LIST OF EMPLOYEES file."
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     return 
 
 
@@ -648,20 +619,24 @@ def almost_equal(float_1, float_2):
 
 def process_monthly(filename, hours_task_plan):
     # Read list of employees
-    list_employees = pd.read_excel(r"LIST OF EMPLOYEES.xlsx")
-    
+    list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
+    list_employees = list_employees[list_employees["Contract status"] == "Active"]
+    name_file = "F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"
     global name_report
     #print(f"Analyzing {filename.name}...")
-    f4e_contract = filename.name.split()[0]
-    name_report = ' '.join(filename.name.split()[3:-3])
+    #f4e_contract = filename.name.split()[0]
+    f4e_contract = name_file.split()[0]
+    #name_report = ' '.join(filename.name.split()[3:-3])
+    name_report = " ".join(name_file.split()[3:-3])
     document = docx.Document(filename)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
-    check_filename(filename.name, header_data)
+    #check_filename(filename.name, header_data)
+    check_filename(name_file, header_data)
     # Get the different expressions of the name.
-    name = get_names(list_names, filename.name)
-    # add_header_hours_to_list(header_data)  # Asked by Arnón, to get a file with all the hours
+    #name = get_names(filename.name, list_employees)
+    name = get_names(name_file, list_employees)
     # Shows revision number in the header
     show_version_message(header_data)
     # Checks if F4E contracts is the same in the name of the report and the header
@@ -671,7 +646,7 @@ def process_monthly(filename, hours_task_plan):
     # Check if number of report (#) is coherent with months passed from KoM
     check_report_number_against_kom_date(header_data)
     # Check if the F4E reference is the same in header and external file
-    check_customer_ref(header_data, name)
+    check_customer_ref(header_data, name, list_employees)
     # Check if the total number of hours in section 2.3 is the same as in the header
     general_hours_report, general_taskplan, specific_taskplans_dic = check_hours_report_vs_header(header_data, document)
     check_hours_header_vs_ext_my_time(header_data, name, hours_task_plan)
@@ -690,3 +665,9 @@ def process_monthly(filename, hours_task_plan):
     check_encryption(document, header_data)
     
     return
+
+
+if __name__ == "__main__":
+    mr_files = [r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"]
+    hours_task_plan = r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\HoursTaskPlan.xlsx"
+    process_mr(mr_files, hours_task_plan)
