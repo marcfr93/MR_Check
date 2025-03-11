@@ -24,7 +24,7 @@ if st.session_state.monthly_reports:
     file_extmytime = st.file_uploader("Upload hours")
     if file_extmytime:
         results = process_mr(st.session_state.monthly_reports, file_extmytime)
-        #previous_name = ""
+        st.session_state.previous_name = None
         #text = ""
         for index, row in results.iterrows():
             if st.session_state.previous_name != row["Name"]:
