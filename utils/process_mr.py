@@ -222,13 +222,7 @@ def check_f4e_contract(code_from_filename, header_data):
 def check_supplier_dms(header_data, name, list_employees):
     """Check if the report of the month, year and person is in the Excel file 'DMS Number Monthly Report.xlsx' and
     also if the DMS number is correspondent"""
-    dms_data_file = Path(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\DMS Number Monthly Report.xlsx")
-    try:
-        dms_table = pd.read_excel(dms_data_file, header=0)
-    except FileNotFoundError:
-        print(f"  Could not find the DMS data file {dms_data_file}.")
-        return
-
+    
     # Get month from report number in header
     month = re.match(r"#\d+_M(\d+)_\d+", header_data.report_number).group(1)  # e.g. "3"
     month = int(month)
@@ -617,6 +611,7 @@ def process_monthly(filename, hours_task_plan):
     list_employees = pd.read_excel(r"LIST OF EMPLOYEES.xlsx")
     list_employees = list_employees[list_employees["Contract status"] == "Active"]
 
+    global name_report
     print(f"Analyzing {filename.name}...")
     f4e_contract = filename.name.split()[0]
     name_report = ' '.join(filename.name.split()[3:-3])
