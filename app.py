@@ -9,7 +9,7 @@ st.set_page_config(layout="wide")
 # Select your folder with MR
 monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
 
-widget = st.empty
+widget = st.empty()
 
 if monthly_reports:
     # Clear the session state to ensure fresh output each time
