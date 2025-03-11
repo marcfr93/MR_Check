@@ -7,10 +7,7 @@ import pandas as pd
 st.set_page_config(layout="wide")
 
 # Clear the session state to ensure fresh output each time
-if 'output_text' in st.session_state:
-    del st.session_state['output_text']
-if 'previous_name' in st.session_state:
-    del st.session_state['previous_name']
+
 if 'monthly_reports' in st.session_state:
     del st.session_state['monthly_reports']
 
@@ -19,8 +16,10 @@ st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", ac
 
 if st.session_state.monthly_reports:
     # Clear the session state to ensure fresh output each time
-    st.session_state.output_text = ""
-    st.session_state.previous_name = ""
+    if 'output_text' in st.session_state:
+        del st.session_state['output_text']
+    if 'previous_name' in st.session_state:
+        del st.session_state['previous_name']
 
     file_extmytime = st.file_uploader("Upload hours")
     if file_extmytime:
