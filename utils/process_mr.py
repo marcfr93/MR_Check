@@ -57,18 +57,13 @@ MONTH_NUMBER_TO_NAME = {
 
 results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
 global hours_task_plan
-#global list_employees
 
 def process_mr(mr_files, hours_task_plan):
-    
-    # results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
-    # total_hours_df = pd.DataFrame(columns=["Reference", "Name", "Hours in report header"])
-    
+       
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
-    #list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
     for report in mr_files:
-        #if report.name.endswith(".docx"):
-        process_monthly(report, hours_task_plan)
+        if report.name.endswith(".docx"):
+            process_monthly(report, hours_task_plan)
 
     return results_df
 
@@ -619,24 +614,19 @@ def almost_equal(float_1, float_2):
 
 def process_monthly(filename, hours_task_plan):
     # Read list of employees
-    list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
+    list_employees = pd.read_excel(r"LIST OF EMPLOYEES.xlsx")
     list_employees = list_employees[list_employees["Contract status"] == "Active"]
-    name_file = "F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"
-    global name_report
-    #print(f"Analyzing {filename.name}...")
-    #f4e_contract = filename.name.split()[0]
-    f4e_contract = name_file.split()[0]
-    #name_report = ' '.join(filename.name.split()[3:-3])
-    name_report = " ".join(name_file.split()[3:-3])
+
+    print(f"Analyzing {filename.name}...")
+    f4e_contract = filename.name.split()[0]
+    name_report = ' '.join(filename.name.split()[3:-3])
     document = docx.Document(filename)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
-    #check_filename(filename.name, header_data)
-    check_filename(name_file, header_data)
+    check_filename(filename.name, header_data)
     # Get the different expressions of the name.
-    #name = get_names(filename.name, list_employees)
-    name = get_names(name_file, list_employees)
+    name = get_names(filename.name, list_employees)
     # Shows revision number in the header
     show_version_message(header_data)
     # Checks if F4E contracts is the same in the name of the report and the header
