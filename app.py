@@ -18,7 +18,7 @@ if st.button("Clear Output"):
     st.session_state.output_text = ""
     st.session_state.previous_name = ""
     st.session_state.processed = False
-    st.experimental_rerun()
+    st.rerun()
 
 # Select your folder with MR
 monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
