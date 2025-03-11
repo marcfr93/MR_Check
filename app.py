@@ -24,7 +24,7 @@ if monthly_reports:
                 
             text = text + f"- {row["Error"]} \n"
             
-        st.markdown(text)
+        st.write(text)
             
             
 
