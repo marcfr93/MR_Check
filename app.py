@@ -9,22 +9,24 @@ st.set_page_config(layout="wide")
 # Clear the session state to ensure fresh output each time
 if 'output_text' in st.session_state:
     del st.session_state['output_text']
-    st.rerun()
 if 'previous_name' in st.session_state:
     del st.session_state['previous_name']
-    st.rerun()
+if 'monthly_reports' in st.session_state:
+    del st.session_state['monthly_reports']
+if 'file_extmytime' in st.session_state:
+    del st.session_state['file_extmytime']
 
 # Select your folder with MR
-monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
+st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
 
-if monthly_reports:
+if st.session_state.monthly_reports:
     # Clear the session state to ensure fresh output each time
     st.session_state.output_text = ""
     st.session_state.previous_name = ""
 
-    file_extmytime = st.file_uploader("Upload hours")
-    if file_extmytime:
-        results = process_mr(monthly_reports, file_extmytime)
+    st.session_state.file_extmytime = st.file_uploader("Upload hours")
+    if st.session_state.file_extmytime:
+        results = process_mr(st.session_state.monthly_reports, st.session_state.file_extmytime)
         #previous_name = ""
         #text = ""
         for index, row in results.iterrows():
