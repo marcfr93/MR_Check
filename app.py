@@ -11,18 +11,20 @@ if 'output_text' in st.session_state:
     del st.session_state['output_text']
 if 'previous_name' in st.session_state:
     del st.session_state['previous_name']
+if 'monthly_reports' in st.session_state:
+    del st.session_state['monthly_reports']
 
 # Select your folder with MR
-monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
+st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
 
-if monthly_reports:
+if st.session_state.monthly_reports:
     # Clear the session state to ensure fresh output each time
     st.session_state.output_text = ""
     st.session_state.previous_name = ""
 
     file_extmytime = st.file_uploader("Upload hours")
     if file_extmytime:
-        results = process_mr(monthly_reports, file_extmytime)
+        results = process_mr(st.session_state.monthly_reports, file_extmytime)
         #previous_name = ""
         #text = ""
         for index, row in results.iterrows():
