@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 import warnings
 import docx
+import io
 import pandas as pd
 import math
 from unidecode import unidecode
@@ -64,8 +65,9 @@ def process_mr(mr_files, hours_task_plan):
     for report in mr_files:
         if report.name.endswith(".docx"):
             process_monthly(report, hours_task_plan)
-
-    return results_df
+    output_df = io.BytesIO()
+    results_df.save(output_df)
+    return output_df
 
 
 def diff_month(d1, d2):
