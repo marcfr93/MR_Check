@@ -14,11 +14,9 @@ def write_issues(results):
 
 def main():
     monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True, key="reports")
-    if monthly_reports:
-        results = None
-        file_extmytime = st.file_uploader("Upload hours", key="hours")
-        if file_extmytime:
-            results = None
+    file_extmytime = st.file_uploader("Upload hours", key="hours")
+    if monthly_reports and file_extmytime:
+        if st.button("Process Reports"):
             results = process_mr(monthly_reports, file_extmytime)
             #st.dataframe(results, key="results_wdg")
             downloaded = st.download_button(
