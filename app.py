@@ -34,4 +34,5 @@ if st.session_state.monthly_reports:
             #st.session_state.output_text += f"- {row['Error']} \n"
             #st.write(f"- {row['Error']} \n")
             st.markdown(f"- {row['Error']} \n")
+            st.empty()
         #st.markdown(st.session_state.output_text)
