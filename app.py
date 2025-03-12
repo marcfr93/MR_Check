@@ -36,7 +36,7 @@ if st.session_state.monthly_reports:
         st.session_state.results = process_mr(st.session_state.monthly_reports, file_extmytime)
         #text = ""
         #write_issues(st.session_state.results)
-        st.write(st.session_state.results)
+        st.dataframe(st.session_state.results)
         
 
 
