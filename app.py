@@ -3,6 +3,15 @@ from utils.process_mr import process_mr
 import pandas as pd
 
 
+def write_issues(results):
+    previous_name = None
+    for index, row in results.iterrows():
+        if previous_name != row["Name"]:
+            st.write(f"\n**Contract {row['Reference']}, {row['Name']}** \n")
+            previous_name = row["Name"]
+        st.write(f"- {row['Error']} \n")
+    return
+
 # Configure layout of page, must be first streamlit call in script
 st.set_page_config(layout="wide")
 
@@ -40,12 +49,5 @@ if st.session_state.monthly_reports:
         #st.markdown(st.session_state.output_text)
         """
 
-def write_issues(results):
-    previous_name = None
-    for index, row in results.iterrows():
-        if previous_name != row["Name"]:
-            st.write(f"\n**Contract {row['Reference']}, {row['Name']}** \n")
-            previous_name = row["Name"]
-        st.write(f"- {row['Error']} \n")
-    return
+
     
