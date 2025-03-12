@@ -22,17 +22,12 @@ if 'monthly_reports' in st.session_state:
 # Select your folder with MR
 st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
 st.write(st.session_state.monthly_reports)
-if st.session_state.monthly_reports:
-    # Clear the session state to ensure fresh output each time
-    if 'output_text' in st.session_state:
-        del st.session_state['output_text']
-    if 'previous_name' in st.session_state:
-        del st.session_state['previous_name']
-    if 'results' in st.session_state:
-        del st.session_state['results']
 
+if st.session_state.monthly_reports:
     file_extmytime = st.file_uploader("Upload hours")
     if file_extmytime:
+        if 'results' in st.session_state:
+            del st.session_state['results']
         st.session_state.results = process_mr(st.session_state.monthly_reports, file_extmytime)
         #text = ""
         #write_issues(st.session_state.results)
