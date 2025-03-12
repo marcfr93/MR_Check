@@ -16,7 +16,7 @@ def write_issues(results):
 st.set_page_config(layout="wide")
 
 # Select your folder with MR
-st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True, key="monthly_reports")
+st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True, key="reports")
 st.write(st.session_state.monthly_reports)
 
 if st.session_state.monthly_reports:
