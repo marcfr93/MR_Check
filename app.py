@@ -28,13 +28,14 @@ if st.session_state.monthly_reports:
         del st.session_state['output_text']
     if 'previous_name' in st.session_state:
         del st.session_state['previous_name']
+    if 'results' in st.session_state:
+        del st.session_state['results']
 
     file_extmytime = st.file_uploader("Upload hours")
     if file_extmytime:
-        results = process_mr(st.session_state.monthly_reports, file_extmytime)
-        st.session_state.previous_name = None
+        st.session_state.results = process_mr(st.session_state.monthly_reports, file_extmytime)
         #text = ""
-        write_issues(results)
+        write_issues(st.session_state.results)
         """
         for index, row in results.iterrows():
             if st.session_state.previous_name != row["Name"]:
