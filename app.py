@@ -16,9 +16,11 @@ def main():
     monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True, key="reports")
     if monthly_reports:
         file_extmytime = st.file_uploader("Upload hours", key="hours")
+        if "results_wdg" in st.session_state:
+            del st.session_state["results_wdg"]
         if file_extmytime:
             results = process_mr(monthly_reports, file_extmytime)
-            st.dataframe(results, key="results")
+            st.dataframe(results, key="results_wdg")
 
 # Configure layout of page, must be first streamlit call in script
 st.set_page_config(layout="wide")
