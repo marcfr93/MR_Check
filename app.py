@@ -15,10 +15,6 @@ def write_issues(results):
 # Configure layout of page, must be first streamlit call in script
 st.set_page_config(layout="wide")
 
-# Clear the session state to ensure fresh output each time
-if 'monthly_reports' in st.session_state:
-    del st.session_state['monthly_reports']
-
 # Select your folder with MR
 st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True, key="monthly_reports")
 st.write(st.session_state.monthly_reports)
