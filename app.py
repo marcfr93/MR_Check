@@ -21,8 +21,8 @@ def main():
             #st.dataframe(results, key="results_wdg")
             downloaded = st.download_button(
                 label="Download", data=results.getvalue(), file_name="results_df.xlsx")
-        if downloaded:
-            st.write("File downloaded!")
+            if downloaded:
+                st.write("File downloaded!")
 
 # Configure layout of page, must be first streamlit call in script
 st.set_page_config(layout="wide")
