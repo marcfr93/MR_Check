@@ -12,9 +12,22 @@ def write_issues(results):
         st.write(f"- {row['Error']} \n")
     return
 
+def main():
+    monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True, key="reports")
+    if monthly_reports:
+        file_extmytime = st.file_uploader("Upload hours", key="hours")
+        if file_extmytime:
+            if 'results' in st.session_state:
+                del st.session_state['results']
+            st.session_state.results = process_mr(st.session_state.monthly_reports, file_extmytime)
+            st.dataframe(st.session_state.results, key="results")
+
 # Configure layout of page, must be first streamlit call in script
 st.set_page_config(layout="wide")
 
+main()
+
+"""
 # Select your folder with MR
 st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True, key="reports")
 st.write(st.session_state.monthly_reports)
@@ -28,6 +41,7 @@ if st.session_state.monthly_reports:
         #text = ""
         #write_issues(st.session_state.results)
         st.dataframe(st.session_state.results, key="results")
+"""
         
 
 
