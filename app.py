@@ -21,7 +21,7 @@ if 'monthly_reports' in st.session_state:
 
 # Select your folder with MR
 st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
-
+st.write(st.session_state.monthly_reports)
 if st.session_state.monthly_reports:
     # Clear the session state to ensure fresh output each time
     if 'output_text' in st.session_state:
