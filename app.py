@@ -25,6 +25,8 @@ if st.session_state.monthly_reports:
         results = process_mr(st.session_state.monthly_reports, file_extmytime)
         st.session_state.previous_name = None
         #text = ""
+        write_issues(results)
+        """
         for index, row in results.iterrows():
             if st.session_state.previous_name != row["Name"]:
                 st.session_state.previous_name = row["Name"]
@@ -36,3 +38,14 @@ if st.session_state.monthly_reports:
             st.markdown(f"- {row['Error']} \n")
             st.empty()
         #st.markdown(st.session_state.output_text)
+        """
+
+def write_issues(results):
+    previous_name = None
+    for index, row in results.iterrows():
+        if previous_name != row["Name"]:
+            st.write(f"\n**Contract {row['Reference']}, {row['Name']}** \n")
+            previous_name = row["Name"]
+        st.write(f"- {row['Error']} \n")
+    return
+    
