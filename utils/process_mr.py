@@ -61,9 +61,9 @@ global hours_task_plan
 def process_mr(report, hours_task_plan):
        
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
-    #for report in mr_files:
-    if report.name.endswith(".docx"):
-        process_monthly(report, hours_task_plan)
+    for report in mr_files:
+        if report.name.endswith(".docx"):
+            process_monthly(report, hours_task_plan)
 
     return results_df
 
