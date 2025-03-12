@@ -10,6 +10,7 @@ st.set_page_config(layout="wide")
 if 'monthly_reports' in st.session_state:
     del st.session_state['monthly_reports']
 
+st.rerun()
 # Select your folder with MR
 st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
 
@@ -32,6 +33,6 @@ if st.session_state.monthly_reports:
                 #st.write(f"\n**Contract {row['Reference']}, {row['Name']}** \n")
                 st.markdown(f"\n**Contract {row['Reference']}, {row['Name']}** \n")
             #st.session_state.output_text += f"- {row['Error']} \n"
-            st.write(f"- {row['Error']} \n")
+            #st.write(f"- {row['Error']} \n")
             st.markdown(f"- {row['Error']} \n")
         #st.markdown(st.session_state.output_text)
