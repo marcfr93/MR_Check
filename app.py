@@ -9,8 +9,8 @@ st.set_page_config(layout="wide")
 # Clear the session state to ensure fresh output each time
 if 'monthly_reports' in st.session_state:
     del st.session_state['monthly_reports']
+    st.rerun()
 
-st.rerun()
 # Select your folder with MR
 st.session_state.monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True)
 
