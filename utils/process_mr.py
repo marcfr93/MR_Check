@@ -66,7 +66,7 @@ def process_mr(mr_files, hours_task_plan):
         if report.name.endswith(".docx"):
             process_monthly(report, hours_task_plan)
     output_df = io.BytesIO()
-    results_df.save(output_df)
+    results_df.to_excel(output_df)
     return output_df
 
 
