@@ -18,7 +18,11 @@ def main():
         file_extmytime = st.file_uploader("Upload hours", key="hours")
         if file_extmytime:
             results = process_mr(monthly_reports, file_extmytime)
-            st.dataframe(results, key="results_wdg")
+            #st.dataframe(results, key="results_wdg")
+            downloaded = st.download_button(
+                label="Download", data=results.getvalue(), file_name="results_df.xlsx")
+        if downloaded:
+            st.write("File downloaded!")
 
 # Configure layout of page, must be first streamlit call in script
 st.set_page_config(layout="wide")
