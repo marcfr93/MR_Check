@@ -26,7 +26,7 @@ def main():
 
 # Configure layout of page, must be first streamlit call in script
 st.set_page_config(layout="wide")
-
+st.legacy_caching.caching.clear_cache()
 main()
 
 """
