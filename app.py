@@ -13,6 +13,8 @@ def write_issues(results):
     return
 
 def main():
+    st.cache_data.clear()
+    st.cache_resource.clear()
     monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True, key="reports")
     file_extmytime = st.file_uploader("Upload hours", key="hours")
     if monthly_reports and file_extmytime:
