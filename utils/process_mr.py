@@ -56,7 +56,6 @@ MONTH_NUMBER_TO_NAME = {
     12: "December",
 }
 
-#results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
 global hours_task_plan
 
 def process_mr(mr_files, hours_task_plan):
@@ -66,8 +65,7 @@ def process_mr(mr_files, hours_task_plan):
     for report in mr_files:
         if report.name.endswith(".docx"):
             process_monthly(report, hours_task_plan)
-    #output_df = io.BytesIO()
-    #results_df.to_excel(output_df)
+            
     return results_df, len(results_df)
 
 
@@ -425,16 +423,14 @@ def get_codes_activities_section(document, cell_ref):
 
     Arguments:
         document (str): whole text of the document
-        start_text (str): string that limits the start of the section
-        end_text (str): string that limits the end of the section
-
+        cell_ref (dic): table and cell numbers
     Returns:
         str: code of the general task
         list: with the codes of the specific tasks
     """
     general_taskplan_code = ""
     specific_taskplans_codes = []
-    # Trim the text to only the wanted part
+    
     section = document.tables[cell_ref["table"]].cell(*cell_ref["cell"]).text
 
     while True:
@@ -606,7 +602,7 @@ def decode_token(token):
     
     
 def almost_equal(float_1, float_2):
-    return math.isclose(float_1, float_2, rel_tol=0.0001)
+    return abs(float_1 - float_2) < 0.0001
 
 
 def process_monthly(filename, hours_task_plan):
