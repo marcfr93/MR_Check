@@ -9,9 +9,8 @@ def main():
     monthly_reports = st.file_uploader("Upload Monthly Reports", accept_multiple_files=True, key="reports")
     file_extmytime = st.file_uploader("Upload hours", key="hours")
     if monthly_reports and file_extmytime:
-        if st.button("Process Reports"):
-            results, length = process_mr(monthly_reports, file_extmytime)
-            st.dataframe(results.iloc[-length:], key="results_wdg")
+        results, length = process_mr(monthly_reports, file_extmytime)
+        st.dataframe(results.iloc[-length:], key="results_wdg")
 
 # Configure layout of page, must be first streamlit call in script
 st.set_page_config(layout="wide")
