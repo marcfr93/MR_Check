@@ -66,7 +66,7 @@ def process_mr(mr_files, hours_task_plan):
         if report.name.endswith(".docx"):
             process_monthly(report, hours_task_plan)
             
-    return results_df, len(results_df)
+    return results_df
 
 
 def diff_month(d1, d2):
