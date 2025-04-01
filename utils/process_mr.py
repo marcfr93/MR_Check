@@ -586,6 +586,7 @@ def check_encryption(mr, header_data):
                         f"tool was not used."
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
         return
+    token = token.split('\n')[1][2:-1]
     dms_decoded = decode_token(token)
     if dms != dms_decoded:
         error_message = f"  The DMS does not correspond to the encrypted key, the pre-processing tool " \
