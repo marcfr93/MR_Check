@@ -686,22 +686,22 @@ def almost_equal(float_1, float_2):
 def process_monthly(filename, hours_task_plan, list_employees):
     # Read list of employees
     
-    name_file = "F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"
+    #name_file = "F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"
 
     global name_report
     
     #print(f"Analyzing {filename.name}...")
-    #f4e_contract = filename.name.split()[0]
-    f4e_contract = name_file.split()[0]
-    #name_report = ' '.join(filename.name.split()[3:-3])
-    name_report = " ".join(name_file.split()[3:-3])
+    f4e_contract = filename.name.split()[0]
+    #f4e_contract = name_file.split()[0]
+    name_report = ' '.join(filename.name.split()[3:-3])
+    #name_report = " ".join(name_file.split()[3:-3])
     #name_report = unidecode(re.match(r".+ Monthly Report (.+\s.+) #", filename).group(1))
     document = docx.Document(filename)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
-    #check_filename(filename.name, header_data)
-    check_filename(name_file, header_data)
+    check_filename(filename.name, header_data)
+    #check_filename(name_file, header_data)
     # Get information from LIST OF EMPLOYEES
     person_data = PersonData(list_employees)
     person_data.select_row(name_report)
