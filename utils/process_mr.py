@@ -737,9 +737,3 @@ def process_monthly(filename, hours_task_plan, list_employees):
     
     return
 
-"""
-if __name__ == "__main__":
-    mr_files = [r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #27 M03 2025.docx"]
-    hours_task_plan = r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\HoursTaskPlan.xlsx"
-    process_mr(mr_files, hours_task_plan)
-"""
