@@ -1,14 +1,8 @@
-import os
 import re
 from datetime import datetime
-from pathlib import Path
-import warnings
 import docx
-import io
 import pandas as pd
-import math
 from unidecode import unidecode
-import time
 from cryptography.fernet import Fernet
 
 # PARAMETERS
@@ -59,13 +53,15 @@ MONTH_NUMBER_TO_NAME = {
 global hours_task_plan
 
 def process_mr(mr_files, hours_task_plan):
+
     global results_df
     results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
+    list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
+    list_employees = list_employees[list_employees["Contract status"] == "Active"]
     for report in mr_files:
-        if report.name.endswith(".docx"):
-            process_monthly(report, hours_task_plan)
-            
+        process_monthly(report, hours_task_plan, list_employees)
+
     return results_df
 
 
@@ -116,29 +112,112 @@ Customer Ref.: {self.customer_ref}"""
         return text
 
 
-class Name:
-    """
-    A class to represent the different configurations of a person's name
+class PersonData:
+    def __init__(self, list_employees):
+        self.df = list_employees
+        self.contract = None
+        self.kom = None
+        self.dms = None
+        self.name_monthly = None
+        self.name_irs = None
+        self.row_data = None
+        self.customer_ref = None
 
-    Attributes
-    ---
-    report: str
-    surname: str
-    age: str
-    """
+    def select_row(self, name_report):
+        self.row_data = self.df[self.df["Name Monthly/Mission"].astype(str).apply(unidecode) == unidecode(name_report)]
+        self.define_data()
+        return
+    
+    def define_data(self):
+        self.contract = self.row_data["Specific Contract"].values[0]
+        self.kom = self.row_data["KoM"].values[0]
+        self.name_monthly = self.row_data["Name Monthly/Mission"].values[0]
+        self.name_irs = self.row_data["Name IRS"].values[0]
+        self.customer_ref = self.row_data["F4E Customer Ref"].values[0]
+        return
+    
+    def get_dms(self, month, year):
+        self.dms = self.row_data[f"{month} {year}"].values[0]
+        return
+    
+
+class Hours:
     def __init__(self):
-        self.report = None
-        self.irs = None
-        self.irs_comma = None
+        self.emt_total = None
+        self.emt_general = None
+        self.emt_specific = None
+        self.report_total = None
+        self.report_general = None
+        self.report_specific = None
+        self.report_general_taskplan = None
+        self.report_taskplan_dic = None
 
-    def convert(self, list_employees):
-        person = list_employees[list_employees["Name Monthly/Mission"].astype(str).apply(unidecode) == unidecode(self.report)]
-        self.irs_comma = unidecode(person["Name IRS"].values[0])
-        name_irs = self.irs_comma.split(", ")
-        self.irs = f"{name_irs[1]} {name_irs[0]}"
-        #self.irs_comma = unidecode(list_names[list_names["Monthly/Mission Request"].apply(unidecode) == unidecode(self.report)]["IRS"].values[0])
-        #name_irs = self.irs_comma.split(", ")
-        #self.irs = unidecode(name_irs[1] + " " + name_irs[0])
+    def hours_extmytime(self, hours_task_plan, person_data):
+        hours_emt = hours_task_plan[hours_task_plan["Full Name"].apply(unidecode).isin([person_data.name_irs, person_data.name_monthly])]
+        self.emt_total = hours_emt["Total Working hours submitted"].sum()
+        self.emt_general = hours_emt[hours_emt["Task Plan Description"].str.contains("General Activities")]["Total Working hours submitted"].values[0]
+        hours_specific = hours_emt[~hours_emt["Task Plan Description"].str.contains("General Activities")]
+        self.emt_specific = dict(zip(hours_specific["Task Plan Code"], hours_specific["Total Working hours submitted"]))
+        return
+
+    def hours_report(self, document, header_data):
+        self.report_general = 0
+        self.report_specific = 0
+        self.report_general_taskplan = ""
+        self.report_taskplan_dic = {}
+        
+        section = document.tables[CURRENT_MILESTONE["table"]].cell(*CURRENT_MILESTONE["cell"]).text
+        while True:
+            try:
+                match = re.search(r"Task.+:\s*(\d+([,.]\d+)?)\s*hours?\s*", section)
+                section = section[match.span()[1]:]
+            except AttributeError:
+                break
+            hours_task = match.group(1).replace(",", ".")
+            line = match.group(0)
+            try:
+                hours_task = float(hours_task)
+                if "General Activities".casefold() in line.casefold():
+                    self.report_general += hours_task
+                    self.report_general_taskplan = line[line.find("(") + 1:line.find(")")]
+                else:
+                    self.report_specific += hours_task
+                    self.report_taskplan_dic[int(line[line.find("(") + 1:line.find(")")])] = hours_task
+            except ValueError:
+                error_message = f"  The number of hours in the line '{line}' could not be transformed to a number." \
+                                f"Check if it is written correctly. The hours of that task could not be processed and," \
+                                f"probably, the total number of hour will be incorrect because of this."
+                print(error_message)
+                results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+            self.report_total = self.report_general + self.report_specific
+        return
+
+        """
+        except ValueError:
+            error_message = f"  The code of the General Activities Task Plan in the report does not match the valid " \
+                            f"format: {hours.report_general_taskplan}. The number of hours in the Task Plan could not be compared " \
+                            f"between ExtMyTime and the report."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+        """
+        """
+        except ValueError:
+            error_message = f"  The code of the General Activities Task Plan in the report does not match the valid " \
+                            f"format: {hours.report_general_taskplan}. The number of hours in the Task Plan could not be compared " \
+                            f"between ExtMyTime and the report."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+        """
+        
+        """
+        # THIS ERROR HAS TO BE TRANSLATED TO THE HOURS CLASS
+        except ValueError:
+            error_message = f"  The code of a Specific Task Plan in the report does not match the valid format: " \
+                            f"{specific_task}. The number of hours in the Task Plan could not be compared between " \
+                            f"ExtMyTime and the report."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+        """
 
 
 def read_header(document):
@@ -210,20 +289,25 @@ def get_names(filename, list_employees):
     return name
 
 
-def check_f4e_contract(code_from_filename, header_data):
+def check_f4e_contract(code_from_filename, header_data, person_data):
     """Check if F4E reference is the same in the name of the report and inside the report"""
     if header_data.f4e_reference not in code_from_filename:
         error_message = f"  The F4E contract shown in the header ({header_data.f4e_reference}) does not match " \
                         f"the one of the Word filename ({code_from_filename})"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    if header_data.f4e_reference != person_data.contract:
+        error_message = f"  The F4E contract shown in the header ({header_data.f4e_reference}) does not match " \
+                        f"the one in the LIST OF EMPLOYEES file ({person_data.contract})"
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     return
 
 
-def check_supplier_dms(header_data, name, list_employees):
+def check_supplier_dms(header_data, person_data):
     """Check if the report of the month, year and person is in the Excel file 'DMS Number Monthly Report.xlsx' and
     also if the DMS number is correspondent"""
-    
+
     # Get month from report number in header
     month = re.match(r"#\d+_M(\d+)_\d+", header_data.report_number).group(1)  # e.g. "3"
     month = int(month)
@@ -231,27 +315,27 @@ def check_supplier_dms(header_data, name, list_employees):
     # Get year from report number in header
     year = re.match(r"#\d+_M\d+_(\d+)", header_data.report_number).group(1)  # eg."2022"
     # Get name from filename
+    """
     if name.irs is None:
         error_message = f"  The name '{name.report}' could not be found in the file with the list of names under the " \
                         f"column named 'Monthly/Mission request'. The DMS number could not be checked."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
         return
-    
+    """
     # Search DMS and compare to report
-    person = list_employees[list_employees["Name Monthly/Mission"].astype(str).apply(unidecode) == name.report]
-    dms = person[f"{month} {year}"]
-    if not pd.isna(dms.values[0]):
-        dms_code = dms.values[0]
-        if dms_code != header_data.supplier_dms:
-            error_message = f"  DMS from database ({dms_code}) does not match DMS from " \
+    person_data.get_dms(month, year)
+    if not pd.isna(person_data.dms):
+        #dms_code = dms.values[0]
+        if person_data.dms != header_data.supplier_dms:
+            error_message = f"  DMS from database ({person_data.dms}) does not match DMS from " \
                             f"header ({header_data.supplier_dms}). Check the DMS number and the month number in the " \
                             f"report."
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     else:
-        error_message = f"  The DMS reference could not be found for {month} {year} for {name.irs}. It could be that " \
-                        f"it is not in the list or that any of these parameters is written incorrectly. " \
+        error_message = f"  The DMS reference could not be found for {month} {year} for {person_data.name_monhlty}. " \
+                        f"Either the DMS is not in the file or any of these parameters is written incorrectly. " \
                         f"It could not be checked if the DMS number is correct."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
@@ -277,14 +361,12 @@ def check_report_number_against_kom_date(header_data):
     return
 
 
-def check_customer_ref(header_data, name, list_employees):
+def check_customer_ref(header_data, person_data):
 
-    customer_ref_list = list_employees.loc[list_employees["Name Monthly/Mission"].astype(str).apply(unidecode) == name.report, "F4E Customer Ref"].values[0]
-
-    if not pd.isna(customer_ref_list):
-        if customer_ref_list != header_data.customer_ref:
+    if not pd.isna(person_data.customer_ref):
+        if person_data.customer_ref != header_data.customer_ref:
             error_message = f"  The F4E Customer Reference in the report ({header_data.customer_ref}) is different" \
-                            f"from the correct reference ({customer_ref_list})"
+                            f"from the correct reference ({person_data.customer_ref})"
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     else:
@@ -294,126 +376,110 @@ def check_customer_ref(header_data, name, list_employees):
     return 
 
 
-def check_hours_report_vs_header(header_data, document):
+def check_hours_report_vs_header(header_data, hours):
     """Check if the number of total hours in the report is the same as the sum of the general activities and the
     specific tasks in the report"""
-    general_hours = 0
-    specific_hours = 0
-    general_taskplan = ""
-    specific_taskplans_dic = {}
-    # Get the part of the part of the text where the reported hours are
-    section = document.tables[CURRENT_MILESTONE["table"]].cell(*CURRENT_MILESTONE["cell"]).text
-
-    # Get the hours done in the period for each task
-    while True:
-        try:
-            match = re.search(r"Task.+:\s*(\d+([,.]\d+)?)\s*hours?\s*", section)
-            section = section[match.span()[1]:]
-        except AttributeError:
-            break
-        hours_task = match.group(1).replace(",", ".")
-        line = match.group(0)
-        try:
-            hours_task = float(hours_task)
-            if "General Activities".casefold() in line.casefold():
-                general_hours += hours_task
-                general_taskplan = line[line.find("(") + 1:line.find(")")]
-            else:
-                specific_hours += hours_task
-                specific_taskplans_dic[line[line.find("(") + 1:line.find(")")]] = hours_task
-        except ValueError:
-            error_message = f"  The number of hours in the line '{line}' could not be transformed to a number." \
-                            f"Check if it is written correctly. The hours of that task could not be processed and," \
-                            f"probably, the total number of hour will be incorrect because of this."
-            print(error_message)
-            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    hours_report = general_hours + specific_hours
-
+    
     # Check if sum of hours in the report is the same as in the header
-    if not almost_equal(float(header_data.reported_hours), hours_report):
-        error_message = f"  The sum of hours of the tasks ({hours_report}) is not the same as the one found " \
+    if not almost_equal(float(header_data.reported_hours), hours.report_total):
+        error_message = f"  The sum of hours of the tasks ({hours.report_total}) is not the same as the one found " \
                         f"in the header ({header_data.reported_hours})"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
-    return general_hours, general_taskplan, specific_taskplans_dic
+    return 
 
 
-def check_hours_header_vs_ext_my_time(header_data, name, hours_task_plan):
+def check_hours_header_vs_ext_my_time(header_data, hours):
     """Check if there are hours in ExtMyTime, the total hours match between ExtMyTime and the report, the general
     activities hours are not more than 8%, the general activities hours in ExtMyTime and the report match and if
     the specific hours in ExtMyTime and the report match."""
 
-    try:
-        hours = hours_task_plan[hours_task_plan["Full Name"].apply(unidecode).isin([name.irs_comma, name.irs, name.report])]
-        ext_my_time_hours = hours["Total Working hours submitted"].sum()
-        general_hours_extmytime = hours[hours["Task Plan Description"].str.contains("General")]["Total Working hours submitted"].values[0]
+    # This Error has to be translated to the HOURS class
+    """
     except IndexError:
-        error_message = f"  Could not find the name '{name.report}' in the list of names file and, consequently, the hours " \
+        error_message = f"  Could not find the name '{person_data.name_irs}' in the list of names file and, consequently, the hours " \
                         f"in the ExtMyTime couldn't be checked"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
         return
-    if almost_equal(ext_my_time_hours, 0):
+    """
+    if almost_equal(hours.emt_total, 0):
         error_message = "  No hours found in the EXT MY TIME"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
         return
-    if not almost_equal(float(header_data.reported_hours), ext_my_time_hours):
+    if not almost_equal(float(header_data.reported_hours), hours.emt_total):
         error_message = f"  The total hours as found in the report ({header_data.reported_hours}) don't match the " \
-                        f"EXT MY TIME hours ({ext_my_time_hours})"
+                        f"EXT MY TIME hours ({hours.emt_total})"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    general_activities_proportion = general_hours_extmytime / ext_my_time_hours * 100
+    general_activities_proportion = hours.emt_general / hours.emt_total * 100
     if general_activities_proportion > 8:
-        error_message = f"  The General Activities task took {float(general_hours_extmytime):.2f} hours, which is a " \
-                        f"{float(general_activities_proportion):.2f}% of the total: {ext_my_time_hours} hours"
+        error_message = f"  The General Activities task took {float(hours.emt_general):.2f} hours, which is a " \
+                        f"{float(general_activities_proportion):.2f}% of the total: {hours.emt_total} hours"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
     return
 
 
-def check_tasks_hours_report_vs_ext_my_time(header_data, general_hours_report, general_taskplan,
-                                            specific_taskplans_dic, hours_task_plan):
+def check_tasks_hours_report_vs_ext_my_time(header_data, hours):
     """Check if the hours for each task plan is coincident between the report and ExtMyTime"""
     # Check the general activities task
-    try:
-        float(general_taskplan)
-        general_hours_extmytime = hours_task_plan.loc[hours_task_plan["Task Plan Code"] == int(general_taskplan), "Total Working hours submitted"]
-        if not almost_equal(general_hours_extmytime, general_hours_report):
-            error_message = f"  The General Activities task hours in ExtMyTime ({float(general_hours_extmytime):.2f}) " \
-                            f"is not coincident with the ones declared in the report " \
-                            f"({float(general_hours_report):.2f})"
-            print(error_message)
-            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    
+    float(hours.report_general_taskplan)
+    if not almost_equal(hours.emt_general, hours.report_general):
+        error_message = f"  The General Activities task hours in ExtMyTime ({float(hours.emt_general):.2f}) " \
+                        f"is not coincident with the ones declared in the report " \
+                        f"({float(hours.report_general):.2f})"
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    # THIS ERROR HAS TO BE PASSED TO THE HOURS CLASS
+    """
     except ValueError:
         error_message = f"  The code of the General Activities Task Plan in the report does not match the valid " \
-                        f"format: {general_taskplan}. The number of hours in the Task Plan could not be compared " \
+                        f"format: {hours.report_general_taskplan}. The number of hours in the Task Plan could not be compared " \
                         f"between ExtMyTime and the report."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    """
 
-    # Check the specific activities tasks
-    for specific_task in specific_taskplans_dic.keys():
-        try:
-            float(specific_task)
-            specific_hours_extmytime = hours_task_plan.loc[hours_task_plan[hours_task_plan["Task Plan Code"] == int(
-                specific_task)].index, "Total Working hours submitted"]
-            if len(specific_hours_extmytime) == 0:
-                specific_hours_extmytime = 0
-            if not almost_equal(specific_hours_extmytime, specific_taskplans_dic[specific_task]):
-                error_message = f"  The hours of Specific Task {specific_task} in ExtMyTime " \
-                                f"({float(specific_hours_extmytime):.2f}) is not coincident with the ones declared " \
-                                f"in the report ({float(specific_taskplans_dic[specific_task]):.2f})"
-                print(error_message)
-                results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-        except ValueError:
-            error_message = f"  The code of a Specific Task Plan in the report does not match the valid format: " \
-                            f"{specific_task}. The number of hours in the Task Plan could not be compared between " \
-                            f"ExtMyTime and the report."
+    for task_code in hours.report_taskplan_dic.keys():
+        if task_code not in hours.emt_specific.keys():
+            hours.emt_specific[task_code] = 0
+        if not almost_equal(hours.emt_specific[task_code], hours.report_taskplan_dic[task_code]):
+            error_message = f"  The hours of Specific Task {task_code} in ExtMyTime " \
+                            f"({float(hours.emt_specific[task_code]):.2f}) are not coincident with the ones declared " \
+                            f"in the report ({float(hours.report_taskplan_dic[task_code]):.2f})"
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+
+    for task_code in hours.emt_specific.keys():
+        if task_code not in hours.report_taskplan_dic.keys():
+            error_message = f"  The hours of Specific Task {task_code} in ExtMyTime were not declared" \
+                            f"in the report."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+
+    """
+    except ValueError:
+        error_message = f"  The code of the General Activities Task Plan in the report does not match the valid " \
+                        f"format: {hours.report_general_taskplan}. The number of hours in the Task Plan could not be compared " \
+                        f"between ExtMyTime and the report."
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    """
+    
+    """
+    # THIS ERROR HAS TO BE TRANSLATED TO THE HOURS CLASS
+    except ValueError:
+        error_message = f"  The code of a Specific Task Plan in the report does not match the valid format: " \
+                        f"{specific_task}. The number of hours in the Task Plan could not be compared between " \
+                        f"ExtMyTime and the report."
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    """
     return
 
 
@@ -423,14 +489,16 @@ def get_codes_activities_section(document, cell_ref):
 
     Arguments:
         document (str): whole text of the document
-        cell_ref (dic): table and cell numbers
+        start_text (str): string that limits the start of the section
+        end_text (str): string that limits the end of the section
+
     Returns:
         str: code of the general task
         list: with the codes of the specific tasks
     """
-    general_taskplan_code = ""
+    general_taskplan_code = None
     specific_taskplans_codes = []
-    
+    # Trim the text to only the wanted part
     section = document.tables[cell_ref["table"]].cell(*cell_ref["cell"]).text
 
     while True:
@@ -448,7 +516,7 @@ def get_codes_activities_section(document, cell_ref):
     return general_taskplan_code, specific_taskplans_codes
 
 
-def check_codes_sections(header_data, name, section, hours_task_plan, document, cell_ref):
+def check_codes_sections(header_data, section, document, cell_ref, hours):
     """
     Checks if the codes of tasks in the text are the same as in the Excel file (Hours Task Plan)
 
@@ -461,31 +529,39 @@ def check_codes_sections(header_data, name, section, hours_task_plan, document, 
         section (str): number of section in the document
     """
     general_code, specific_codes = get_codes_activities_section(document, cell_ref)
+    if general_code is None:
+        error_message = f"  No General Activity code in section {section} could be found in the report. " \
+                        f"Check if the format of the code is correct."
+        print(error_message)    
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    elif general_code != hours.report_general_taskplan:
+        error_message = f"  In section {section}, the General Activity code '{general_code}' cannot be found in " \
+                        f"the Task Plan Hours. Either the format of the code is not correct or the number of the " \
+                        f"activity code is not correct."
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    if len(specific_codes) == 0:
+        error_message = f"  No Specific Activity code in section {section} could be found in the report. " \
+                        f"Check if the format of the code is correct."
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    for code in specific_codes:
+        if not int(code) in hours.emt_specific.keys():
+            error_message = f"  In section {section}, the Specific Activity code '{code}' cannot be found in the" \
+                            f"Task Plan Hours. Either the format of the code is not correct or the number of the" \
+                            f"activity code is not correct."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
-    hours_person = hours_task_plan[hours_task_plan["Full Name"].apply(unidecode).isin([name.irs_comma, name.irs, name.report])]
+    # THIS ERROR HAS TO BE PASSED TO THE HOURS CLASS
+    """
     if len(hours_person) == 0:
-        error_message = f"  The name of the person {name.irs_comma}, could not be found in the list with the hours in " \
+        error_message = f"  The name of the person {person_data}, could not be found in the list with the hours in " \
                         f"ExtMyTime. The correspondence of the codes in section 2.2 and 2.4 with the Task Plan " \
                         f"could not be checked."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    else:
-        general_code_excel = hours_person[hours_person["Task Plan Description"].str.contains("General Activities")]["Task Plan Code"]
-        if general_code not in general_code_excel.values.astype(str):
-            error_message = f"  In section {section}, the General Activity code '{general_code}' cannot be found in " \
-                            f"the Task Plan Hours. Either the format of the code is not correct or the number of the " \
-                            f"activity code is not correct."
-            print(error_message)
-            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-        specific_codes_excel = hours_person[~hours_person["Task Plan Description"].str.contains("General Activities")]["Task Plan Code"]
-        for code in specific_codes:
-            if code not in specific_codes_excel.values.astype(str):
-                error_message = f"  In section {section}, the Specific Activity code '{code}' cannot be found in the" \
-                                f"Task Plan Hours. Either the format of the code is not correct or the number of the" \
-                                f"activity code is not correct."
-                print(error_message)
-                results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-
+    """
     return
 
 
@@ -603,43 +679,53 @@ def decode_token(token):
     
     
 def almost_equal(float_1, float_2):
-    return abs(float_1 - float_2) < 0.0001
+    return abs(float_1 - float_2) <= 0.0001
 
 
-def process_monthly(filename, hours_task_plan):
+def process_monthly(filename, hours_task_plan, list_employees):
     # Read list of employees
-    list_employees = pd.read_excel(r"LIST OF EMPLOYEES.xlsx")
-    list_employees = list_employees[list_employees["Contract status"] == "Active"]
+    
+    name_file = "F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"
 
     global name_report
-    print(f"Analyzing {filename.name}...")
-    f4e_contract = filename.name.split()[0]
-    name_report = ' '.join(filename.name.split()[3:-3])
+    
+    #print(f"Analyzing {filename.name}...")
+    #f4e_contract = filename.name.split()[0]
+    f4e_contract = name_file.split()[0]
+    #name_report = ' '.join(filename.name.split()[3:-3])
+    name_report = " ".join(name_file.split()[3:-3])
+    #name_report = unidecode(re.match(r".+ Monthly Report (.+\s.+) #", filename).group(1))
     document = docx.Document(filename)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
-    check_filename(filename.name, header_data)
-    # Get the different expressions of the name.
-    name = get_names(filename.name, list_employees)
+    #check_filename(filename.name, header_data)
+    check_filename(name_file, header_data)
+    # Get information from LIST OF EMPLOYEES
+    person_data = PersonData(list_employees)
+    person_data.select_row(name_report)
+    # Get Hours from ExtMyTime and report
+    hours = Hours()
+    hours.hours_extmytime(hours_task_plan, person_data)
+    hours.hours_report(document, header_data)
     # Shows revision number in the header
     show_version_message(header_data)
     # Checks if F4E contracts is the same in the name of the report and the header
-    check_f4e_contract(f4e_contract, header_data)
+    check_f4e_contract(f4e_contract, header_data, person_data)
     # Check if DMS in the header and in "DMS Number Monthly Report.xlsx" are the same
-    check_supplier_dms(header_data, name, list_employees)
+    check_supplier_dms(header_data, person_data)
     # Check if number of report (#) is coherent with months passed from KoM
     check_report_number_against_kom_date(header_data)
     # Check if the F4E reference is the same in header and external file
-    check_customer_ref(header_data, name, list_employees)
+    check_customer_ref(header_data, person_data)
     # Check if the total number of hours in section 2.3 is the same as in the header
-    general_hours_report, general_taskplan, specific_taskplans_dic = check_hours_report_vs_header(header_data, document)
-    check_hours_header_vs_ext_my_time(header_data, name, hours_task_plan)
+    check_hours_report_vs_header(header_data, hours)
+    check_hours_header_vs_ext_my_time(header_data, hours)
     # Check if hours for each task plan is the same in the report and ExtMyTime
-    check_tasks_hours_report_vs_ext_my_time(header_data, general_hours_report, general_taskplan, specific_taskplans_dic, hours_task_plan)
+    check_tasks_hours_report_vs_ext_my_time(header_data, hours)
     # Check numerical Codes of tasks in sections 2.2 and 2.4
-    check_codes_sections(header_data, name, "2.2", hours_task_plan, document, NEW_MILESTONE)
-    check_codes_sections(header_data, name, "2.4", hours_task_plan, document, MILESTONE_TO_COPY)
+    check_codes_sections(header_data, "2.2", document, NEW_MILESTONE, hours)
+    check_codes_sections(header_data, "2.4", document, MILESTONE_TO_COPY, hours)
     # Check both dates in section 3 are the same
     check_dates_section3(document, header_data)
     # Check there are no "forbidden words" in the text
@@ -653,6 +739,6 @@ def process_monthly(filename, hours_task_plan):
 
 
 if __name__ == "__main__":
-    mr_files = [r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #26 M02 2025.docx"]
+    mr_files = [r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\F4E-OMF-1159-01-01-36 Monthly Report Marc Ferrater #27 M03 2025.docx"]
     hours_task_plan = r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\HoursTaskPlan.xlsx"
     process_mr(mr_files, hours_task_plan)
