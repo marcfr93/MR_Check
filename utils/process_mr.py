@@ -155,6 +155,15 @@ class Hours:
 
     def hours_extmytime(self, hours_task_plan, person_data):
         hours_emt = hours_task_plan[hours_task_plan["Full Name"].apply(unidecode).isin([person_data.name_irs, person_data.name_monthly])]
+        if len(hours_emt) == 0:
+            error_message = f"  The name '{person_data.name_irs}' could not be found in the ExtMyTime file and, consequently, the hours " \
+                            f"couldn't be checked"
+            print(error_message)
+            results_df.loc[len(results_df)] = [person_data.contract, name_report, error_message[2:]]
+            self.emt_total = 0
+            self.emt_general = 0
+            self.emt_specific = {}
+            return
         self.emt_total = hours_emt["Total Working hours submitted"].sum()
         self.emt_general = hours_emt[hours_emt["Task Plan Description"].str.contains("General Activities")]["Total Working hours submitted"].values[0]
         hours_specific = hours_emt[~hours_emt["Task Plan Description"].str.contains("General Activities")]
