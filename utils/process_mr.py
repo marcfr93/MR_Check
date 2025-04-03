@@ -58,6 +58,7 @@ def process_mr(mr_files, hours_task_plan):
     results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
     #list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
+    list_employees = pd.read_excel("LIST OF EMPLOYEES.xlsx")
     list_employees = list_employees[list_employees["Contract status"] == "Active"]
     for report in mr_files:
         process_monthly(report, hours_task_plan, list_employees)
