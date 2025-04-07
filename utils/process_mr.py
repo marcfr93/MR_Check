@@ -57,7 +57,8 @@ def process_mr(mr_files, hours_task_plan):
     global results_df
     results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
     hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
-    list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
+    #list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
+    list_employees = pd.read_excel("LIST OF EMPLOYEES.xlsx")
     list_employees = list_employees[list_employees["Contract status"] == "Active"]
     for report in mr_files:
         process_monthly(report, hours_task_plan, list_employees)
@@ -694,22 +695,22 @@ def almost_equal(float_1, float_2):
 def process_monthly(filename, hours_task_plan, list_employees):
     # Read list of employees
     
-    name_file = "F4E-OMF-1159-01-01-106 Monthly Report Urszula Pitera #09 M03 2025.docx"
+    #name_file = "F4E-OMF-1159-01-01-106 Monthly Report Urszula Pitera #09 M03 2025.docx"
 
     global name_report
     
     #print(f"Analyzing {filename.name}...")
-    #f4e_contract = filename.name.split()[0]
-    f4e_contract = name_file.split()[0]
-    #name_report = ' '.join(filename.name.split()[3:-3])
-    name_report = unidecode(" ".join(name_file.split()[3:-3]))
+    f4e_contract = filename.name.split()[0]
+    #f4e_contract = name_file.split()[0]
+    name_report = unidecode(' '.join(filename.name.split()[3:-3]))
+    #name_report = unidecode(" ".join(name_file.split()[3:-3]))
     #name_report = unidecode(re.match(r".+ Monthly Report (.+\s.+) #", filename).group(1))
     document = docx.Document(filename)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
-    #check_filename(filename.name, header_data)
-    check_filename(name_file, header_data)
+    check_filename(filename.name, header_data)
+    #check_filename(name_file, header_data)
     # Get information from LIST OF EMPLOYEES
     person_data = PersonData(list_employees)
     person_data.select_row(name_report)
@@ -747,7 +748,4 @@ def process_monthly(filename, hours_task_plan, list_employees):
     return
 
 
-if __name__ == "__main__":
-    mr_files = [r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\F4E-OMF-1159-01-01-106 Monthly Report Urszula Pitera #09 M03 2025.docx"]
-    hours_task_plan = r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\utils\HoursTaskPlan 2.xlsx"
-    process_mr(mr_files, hours_task_plan)
+
