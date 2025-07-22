@@ -4,6 +4,7 @@ import docx
 import pandas as pd
 from unidecode import unidecode
 from cryptography.fernet import Fernet
+from xml.etree.cElementTree import XML  
 
 # PARAMETERS
 REPORT_NUMBER = {"table": 0, "cell": (0, 2)}
@@ -50,6 +51,9 @@ MONTH_NUMBER_TO_NAME = {
     12: "December",
 }
 
+WORD_NAMESPACE = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+TEXT = WORD_NAMESPACE + "t"
+
 global hours_task_plan
 
 def process_mr(mr_files, hours_task_plan):
@@ -64,6 +68,29 @@ def process_mr(mr_files, hours_task_plan):
         process_monthly(report, hours_task_plan, list_employees)
 
     return results_df
+
+def accept_all_changes(document):
+    cells = [REPORT_NUMBER, VERSION, F4E_REFERENCE, CUSTOMER_REF, DMS_CELL, KOM_DATE, H_IN_PERIOD_CELL,
+             AUTHOR_NAME, DATE_AUTHOR, DATE_APPROVAL, NEW_MILESTONE, CURRENT_MILESTONE, MILESTONE_TO_COPY,
+             TOTAL_HOURS, SECTION3, PERIODS[0], PERIODS[1], PERIODS[2]]
+    
+    for cell in cells:
+        cell_text = document.tables[cell["table"]].cell(*cell["cell"])
+        new_cell_text = ""
+        for para in cell_text.paragraphs:
+            new_cell_text += get_accepted_text(para) + "\n"
+        document.tables[cell["table"]].cell(*cell["cell"]).text = new_cell_text
+    return document
+
+
+def get_accepted_text(p):
+    xml = p._p.xml
+    if "w:del" in xml or "w:ins" in xml:
+        tree = XML(xml)
+        runs = (node.text for node in tree.iter(TEXT) if node.text)
+        return "".join(runs)
+    else:
+        return p.text
 
 
 def diff_month(d1, d2):
@@ -130,11 +157,11 @@ class PersonData:
         return
     
     def define_data(self):
-        self.contract = self.row_data["Specific Contract"].values[0]
+        self.contract = self.row_data["Specific Contract"].values[0].strip()
         self.kom = self.row_data["KoM"].values[0]
         self.name_monthly = unidecode(self.row_data["Name Monthly/Mission"].values[0])
         self.name_irs = unidecode(self.row_data["Name IRS"].values[0])
-        self.customer_ref = self.row_data["F4E Customer Ref"].values[0]
+        self.customer_ref = self.row_data["F4E Customer Ref"].values[0].strip()
         return
     
     def get_dms(self, month, year):
@@ -173,13 +200,14 @@ class Hours:
     def hours_report(self, document, header_data):
         self.report_general = 0
         self.report_specific = 0
+        #self.report_total = 0
         self.report_general_taskplan = ""
         self.report_taskplan_dic = {}
-        
+        i = 0
         section = document.tables[CURRENT_MILESTONE["table"]].cell(*CURRENT_MILESTONE["cell"]).text
-        while True:
+        while True and i < 10:
             try:
-                match = re.search(r"Task.+:\s*(\d+([,.]\d+)?)\s*hours?\s*", section)
+                match = re.search(r"task.+:\s*(\d+([,.]\d+)?)\s*hours?\s*", section.lower())
                 section = section[match.span()[1]:]
             except AttributeError:
                 break
@@ -199,7 +227,10 @@ class Hours:
                                 f"probably, the total number of hour will be incorrect because of this."
                 print(error_message)
                 results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-            self.report_total = self.report_general + self.report_specific
+            
+        self.report_total = self.report_general + self.report_specific
+        i += 1
+
         return
 
         """
@@ -245,6 +276,8 @@ def read_header(document):
     header_data.version = document.tables[VERSION["table"]].cell(*VERSION["cell"]).text.strip()
     header_data.f4e_reference = document.tables[F4E_REFERENCE["table"]].cell(*F4E_REFERENCE["cell"]).text.strip()
     header_data.customer_ref = document.tables[CUSTOMER_REF["table"]].cell(*CUSTOMER_REF["cell"]).text.strip()
+    #dms = get_accepted_text(document.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).paragraphs[0])
+    #header_data.supplier_dms = dms
     header_data.supplier_dms = document.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).text.strip()
     header_data.kom_date = document.tables[KOM_DATE["table"]].cell(*KOM_DATE["cell"]).text.strip()
     hours = document.tables[H_IN_PERIOD_CELL["table"]].cell(*H_IN_PERIOD_CELL["cell"]).text.strip()
@@ -311,6 +344,8 @@ def check_f4e_contract(code_from_filename, header_data, person_data):
                         f"the one in the LIST OF EMPLOYEES file ({person_data.contract})"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+
+
     return
 
 
@@ -344,7 +379,7 @@ def check_supplier_dms(header_data, person_data):
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     else:
-        error_message = f"  The DMS reference could not be found for {month} {year} for {person_data.name_monhlty}. " \
+        error_message = f"  The DMS reference could not be found for {month} {year} for {person_data.name_monthly}. " \
                         f"Either the DMS is not in the file or any of these parameters is written incorrectly. " \
                         f"It could not be checked if the DMS number is correct."
         print(error_message)
@@ -373,16 +408,24 @@ def check_report_number_against_kom_date(header_data):
 
 def check_customer_ref(header_data, person_data):
 
-    if not pd.isna(person_data.customer_ref):
-        if person_data.customer_ref != header_data.customer_ref:
-            error_message = f"  The F4E Customer Reference in the report ({header_data.customer_ref}) is different" \
-                            f"from the correct reference ({person_data.customer_ref})"
+    if pd.isna(person_data.customer_ref):
+        if header_data.customer_ref != "N/A":
+            error_message = f"  The F4E Customer Reference in the report ({header_data.customer_ref}) is not 'N/A' but there isn't a" \
+                            f"F4E Customer Reference in the LIST OF EMPLOYEES file."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+        if header_data.customer_ref == "":
+            error_message = f"  The F4E Customer Reference in the report ({header_data.customer_ref}) is empty. While there isn't a" \
+                            f"F4E Customer Reference in the LIST OF EMPLOYEES file, the header should indicate 'N/A'."
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     else:
-        error_message = f"  Could not find a F4E Customer Reference in the LIST OF EMPLOYEES file."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+        if header_data.customer_ref != person_data.customer_ref:
+            error_message = f"  The F4E Customer Reference in the report ({header_data.customer_ref}) is different from the " \
+                            f"F4E Customer Reference in the LIST OF EMPLOYEES file ({person_data.customer_ref})"
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+
     return 
 
 
@@ -437,7 +480,6 @@ def check_hours_header_vs_ext_my_time(header_data, hours):
 def check_tasks_hours_report_vs_ext_my_time(header_data, hours):
     """Check if the hours for each task plan is coincident between the report and ExtMyTime"""
     # Check the general activities task
-    
     float(hours.report_general_taskplan)
     if not almost_equal(hours.emt_general, hours.report_general):
         error_message = f"  The General Activities task hours in ExtMyTime ({float(hours.emt_general):.2f}) " \
@@ -631,7 +673,7 @@ def check_dates_section3(document, header_data):
     return
 
 def check_text_forbidden_words(text: str, header_data):
-    forbidden = ["F4E Project Manager", "F4E Manager", "F4E Line Manager"]
+    forbidden = ["F4E Project Manager", "F4E Manager", "F4E Line Manager", "Mindfulness"]
     for word in forbidden:
         if word.lower() in text.lower():
             error_message = f"  The expression '{word}' appears in the body of the document, please delete it."
@@ -686,8 +728,14 @@ def decode_token(token):
     f = Fernet(key)
     dms = f.decrypt(token.encode('utf-8'))
     return dms.decode('utf-8')
-    
-    
+
+
+def no_errors_message(header_data) -> None:
+    if results_df[(results_df["Reference"] == header_data.f4e_reference) & 
+                   (results_df["Name"] == name_report)].empty:
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, "Monthly Report processed, no errors found."]
+    return
+
 def almost_equal(float_1, float_2):
     return abs(float_1 - float_2) <= 0.0001
 
@@ -706,6 +754,7 @@ def process_monthly(filename, hours_task_plan, list_employees):
     #name_report = unidecode(" ".join(name_file.split()[3:-3]))
     #name_report = unidecode(re.match(r".+ Monthly Report (.+\s.+) #", filename).group(1))
     document = docx.Document(filename)
+    document = accept_all_changes(document)
     # Get header fields
     header_data = read_header(document)
     # Check if the name of the file follows correct structure
@@ -744,7 +793,10 @@ def process_monthly(filename, hours_task_plan, list_employees):
     check_months_header(document, header_data)
     # Check encrypted key
     check_encryption(document, header_data)
-    
+
+    # If no error message, add note saying everything is ok
+    no_errors_message(header_data)
+
     return
 
 
