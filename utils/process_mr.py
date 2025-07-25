@@ -161,7 +161,12 @@ class PersonData:
         self.kom = self.row_data["KoM"].values[0]
         self.name_monthly = unidecode(self.row_data["Name Monthly/Mission"].values[0])
         self.name_irs = unidecode(self.row_data["Name IRS"].values[0])
-        self.customer_ref = self.row_data["F4E Customer Ref"].values[0].strip()
+        customer_ref = self.row_data["F4E Customer Ref"].values[0]
+        if pd.isna(customer_ref):
+            self.customer_ref = customer_ref
+        else:
+            self.customer_ref = customer_ref.strip()
+        #self.customer_ref = self.row_data["F4E Customer Ref"].values[0].strip()
         return
     
     def get_dms(self, month, year):
