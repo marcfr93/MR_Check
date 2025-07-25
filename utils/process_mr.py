@@ -711,7 +711,7 @@ def check_months_header(document, header_data):
 
 
 def check_encryption(mr, header_data):
-    dms = mr.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).text
+    dms = mr.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).text.strip()
     try:
         token = mr.tables[KEY_ENCRYPTED["table"]].cell(*KEY_ENCRYPTED["cell"]).text
     except IndexError:
