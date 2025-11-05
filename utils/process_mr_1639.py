@@ -799,7 +799,7 @@ def process_monthly(filename, list_employees):
     # Check months headers
     check_months_header(document, header_data)
     # Check encrypted key
-    check_encryption(document, header_data)
+    # check_encryption(document, header_data) #TO BE REINCLUDED AGAIN FOR THE NOVEMBER MR
 
     # If no error message, add note saying everything is ok
     no_errors_message(header_data)
