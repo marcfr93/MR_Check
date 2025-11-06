@@ -152,6 +152,8 @@ class PersonData:
         self.row_data = None
 
     def select_row(self, name_report):
+        if name_report == "Raul del Val":
+            name_report = "Raul Del Val"
         #self.row_data = self.df[self.df["Name Monthly/Mission"].astype(str).apply(unidecode) == unidecode(name_report)]
         self.row_data = self.df[self.df["Employee"].astype(str).apply(unidecode) == unidecode(name_report)]
         self.define_data()
