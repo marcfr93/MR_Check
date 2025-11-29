@@ -10,7 +10,6 @@ from xml.etree.cElementTree import XML
 REPORT_NUMBER = {"table": 0, "cell": (0, 2)}
 VERSION = {"table": 0, "cell": (0, 4)}
 F4E_REFERENCE = {"table": 0, "cell": (1, 2)}
-#CUSTOMER_REF = {"table": 0, "cell": (1, 4)} TO BE DELETED WITH NEW CONTRACT
 DMS_CELL = {"table": 0, "cell": (1, 4)}
 KOM_DATE = {"table": 1, "cell": (1, 1)}
 H_IN_PERIOD_CELL = {"table": 1, "cell": (1, 3)}
@@ -59,19 +58,32 @@ TEXT = WORD_NAMESPACE + "t"
 
 global hours_task_plan
 
-def process_mr_1639(mr_files): #, hours_task_plan):
+def process_mr_1639(mr_files, hours_timetell):
 
     global results_df
     results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
     #hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
+    hours_timetell = pd.read_excel(hours_timetell)
     #list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
     list_employees = pd.read_excel("LIST OF EMPLOYEES 1639.xlsx")
-    list_employees = list_employees[list_employees["Contract status"] == "Active"]
+    #list_employees = list_employees[list_employees["Contract status"] == "Active"]
     for report in mr_files:
-        process_monthly(report, list_employees)
+        process_monthly(report, list_employees, hours_timetell)
 
     return results_df
 
+
+
+
+
+#### FUNCTIONS PART 1 ####
+def get_data_from_filename(filename):
+    f4e_contract = filename.name.split()[0]
+    name_report = unidecode(' '.join(filename.name.split()[3:-3]))
+    return f4e_contract, name_report
+
+
+#### FUNCTIONS PART 2 ####
 def accept_all_changes(document):
     cells = [REPORT_NUMBER, VERSION, F4E_REFERENCE, DMS_CELL, KOM_DATE, H_IN_PERIOD_CELL,
              AUTHOR_NAME, DATE_AUTHOR, DATE_APPROVAL, NEW_MILESTONE, CURRENT_MILESTONE, MILESTONE_TO_COPY,
@@ -95,20 +107,7 @@ def get_accepted_text(p):
     else:
         return p.text
 
-
-def diff_month(d1, d2):
-    """
-    Returns the difference of months between two dates
-
-    Arguments:
-        d1 (datetime)
-        d2 (datetime)
-    Returns:
-        int
-    """
-    return (d1.year - d2.year) * 12 + d1.month - d2.month
-
-
+#### CLASSES PARTS 3 AND 4 ####
 class HeaderData:
     def __init__(self):
         self.report_number = None
@@ -149,12 +148,14 @@ class PersonData:
         self.dms = None
         self.name_monthly = None
         self.name_irs = None
+        self.name_atg = None
+        self.name_timetell = None
         self.row_data = None
 
     def select_row(self, name_report):
+        #self.row_data = self.df[self.df["Name Monthly/Mission"].astype(str).apply(unidecode) == unidecode(name_report)]
         if name_report == "Raul del Val":
             name_report = "Raul Del Val"
-        #self.row_data = self.df[self.df["Name Monthly/Mission"].astype(str).apply(unidecode) == unidecode(name_report)]
         self.row_data = self.df[self.df["Employee"].astype(str).apply(unidecode) == unidecode(name_report)]
         self.define_data()
         return
@@ -167,12 +168,14 @@ class PersonData:
         self.name_monthly = unidecode(self.row_data["Employee"].values[0])
         #self.name_irs = unidecode(self.row_data["Name IRS"].values[0])
         self.name_irs = unidecode(self.row_data["Employee"].values[0])
+        self.name_atg = unidecode(self.row_data["ATG Account Name"].values[0])
         return
     
     def get_dms(self, month, year):
         self.dms = self.row_data[f"{month} {year}"].values[0]
         return
     
+
 
 class Hours:
     def __init__(self):
@@ -202,6 +205,24 @@ class Hours:
         self.emt_specific = dict(zip(hours_specific["Task Plan Code"], hours_specific["Total Working hours submitted"]))
         return
     """
+    def hours_exported(self, hours_ttexport, person_data):
+        self.ttexported_general = 0
+        self.ttexported_specific = {}
+        #hours_tt = hours_ttexport[hours_ttexport["Employee name"].astype(str).apply(unidecode).isin([person_data.name_timetell, person_data.name_monthly])]
+        hours_ttexport['name_tt'] = hours_ttexport["Employee name"].str.split(",").str[1].str[1:] + " " + hours_ttexport["Employee name"].str.split(",").str[0]
+        hours_tt = hours_ttexport[hours_ttexport["name_tt"].astype(str).apply(unidecode) == person_data.name_atg]
+
+        #hours_tt = hours_ttexport[hours_ttexport["Employee name"].astype(str).apply(unidecode) == 'Ferrater Roca, Marc']
+        hours_tt['Activity name'] = hours_tt['Activity name'].str.replace('Task: ', '', regex=False)
+        
+        tasks_hours = hours_tt[['Hours', 'Activity name']].groupby('Activity name').sum()
+        print(tasks_hours)
+        self.ttexported_specific = tasks_hours.to_dict()['Hours']
+        self.ttexported_general = self.ttexported_specific[self.report_general_taskplan]
+        self.ttexported_specific.pop(self.report_general_taskplan)
+        print(self.ttexported_specific)
+        return
+
     def hours_timetell(self, document):
         
         self.timetell_general = 0
@@ -211,9 +232,10 @@ class Hours:
         # ERROR IN CASE THE TABLE IS NOT FOUND
 
         for row in hours_table.rows[1:]:
-            print(row.cells[4].text)
-            hours_task = float(row.cells[4].text.strip().replace(",", "."))
-            key = int(row.cells[1].text.strip())
+            hours_task = float(row.cells[5].text.strip().replace(",", "."))
+            key = int(row.cells[2].text.strip())
+            if "Total".casefold() in row.cells[0].text.strip().casefold():
+                continue
             if str(key) == self.report_general_taskplan:
                 self.timetell_general += hours_task
             elif key in self.timetell_specific:
@@ -268,34 +290,8 @@ class Hours:
 
         return
 
-        """
-        except ValueError:
-            error_message = f"  The code of the General Activities Task Plan in the report does not match the valid " \
-                            f"format: {hours.report_general_taskplan}. The number of hours in the Task Plan could not be compared " \
-                            f"between ExtMyTime and the report."
-            print(error_message)
-            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-        """
-        """
-        except ValueError:
-            error_message = f"  The code of the General Activities Task Plan in the report does not match the valid " \
-                            f"format: {hours.report_general_taskplan}. The number of hours in the Task Plan could not be compared " \
-                            f"between ExtMyTime and the report."
-            print(error_message)
-            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-        """
-        
-        """
-        # THIS ERROR HAS TO BE TRANSLATED TO THE HOURS CLASS
-        except ValueError:
-            error_message = f"  The code of a Specific Task Plan in the report does not match the valid format: " \
-                            f"{specific_task}. The number of hours in the Task Plan could not be compared between " \
-                            f"ExtMyTime and the report."
-            print(error_message)
-            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-        """
 
-
+#### FUNCTIONS PART 3 ####
 def read_header(document):
     """
     Extracts the data from the header of the monthly report
@@ -310,9 +306,6 @@ def read_header(document):
     header_data.report_number = document.tables[REPORT_NUMBER["table"]].cell(*REPORT_NUMBER["cell"]).text.strip()
     header_data.version = document.tables[VERSION["table"]].cell(*VERSION["cell"]).text.strip()
     header_data.f4e_reference = document.tables[F4E_REFERENCE["table"]].cell(*F4E_REFERENCE["cell"]).text.strip()
-    #header_data.customer_ref = document.tables[CUSTOMER_REF["table"]].cell(*CUSTOMER_REF["cell"]).text.strip()
-    #dms = get_accepted_text(document.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).paragraphs[0])
-    #header_data.supplier_dms = dms
     header_data.supplier_dms = document.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).text.strip()
     header_data.kom_date = document.tables[KOM_DATE["table"]].cell(*KOM_DATE["cell"]).text.strip()
     hours = document.tables[H_IN_PERIOD_CELL["table"]].cell(*H_IN_PERIOD_CELL["cell"]).text.strip()
@@ -328,15 +321,20 @@ def read_header(document):
     return header_data
 
 
-def add_header_hours_to_list(header_data):
+#### FUNCTIONS PART 5 ####
+def check_filename(filename, header_data):
     """
-    Adds in the total_hours_df the hours done by the person during the period, as per the information
-    in the report header
+    Checks if the name of the file follows the structure
 
-    Parameters:
-        header_data (class)
+    Arguments:
+        filename (str): name of the file
     """
-    total_hours_df.loc[len(total_hours_df)] = [header_data.f4e_reference, name_report, header_data.reported_hours]
+    name_split = filename.split()
+    if name_split[1] != "Monthly" or name_split[2] != "Report":
+        error_message = f"  The name of the file is not according to the template. It should be as follows: " \
+                        f"'F4E-OMF-1159-01-01-XX Monthly Report Name Surname #YY MZZ 2023.docx'"
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     return
 
 
@@ -348,23 +346,6 @@ def show_version_message(header_data):
     """
     print(f"  The revision number in the header is {header_data.version}. Make sure this is correct.")
     return
-
-
-def get_names(filename, list_employees):
-    """
-    Initializes class name, reads the name in the title of the report and converts it to the other two formats.
-
-    Parameters:
-        list_names (dataframe): extracted from the file with all the names and their equivalents
-        filename (str): file name of the monthly report file
-    Returns:
-        name (class)
-    """
-    name = Name()
-    name.report = unidecode(re.match(r".+ Monthly Report (.+\s.+) #", filename).group(1))
-    name.convert(list_employees)
-
-    return name
 
 
 def check_f4e_contract(code_from_filename, header_data, person_data):
@@ -393,15 +374,7 @@ def check_supplier_dms(header_data, person_data):
     month = MONTH_NUMBER_TO_NAME[month]  # e.g. "March"
     # Get year from report number in header
     year = re.match(r"#\d+_M\d+_(\d+)", header_data.report_number).group(1)  # eg."2022"
-    # Get name from filename
-    """
-    if name.irs is None:
-        error_message = f"  The name '{name.report}' could not be found in the file with the list of names under the " \
-                        f"column named 'Monthly/Mission request'. The DMS number could not be checked."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-        return
-    """
+
     # Search DMS and compare to report
     person_data.get_dms(month, year)
     if not pd.isna(person_data.dms):
@@ -440,6 +413,21 @@ def check_report_number_against_kom_date(header_data):
     return
 
 
+def diff_month(d1, d2):
+    """
+    Returns the difference of months between two dates
+
+    Arguments:
+        d1 (datetime)
+        d2 (datetime)
+    Returns:
+        int
+    """
+    return (d1.year - d2.year) * 12 + d1.month - d2.month
+
+
+#### FUNCTIONS SECTION 6 ####
+
 def check_hours_report_vs_header(header_data, hours):
     """Check if the number of total hours in the report is the same as the sum of the general activities and the
     specific tasks in the report"""
@@ -450,7 +438,6 @@ def check_hours_report_vs_header(header_data, hours):
                         f"in the header ({header_data.reported_hours})"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-
     return 
 
 
@@ -459,15 +446,6 @@ def check_hours_header_vs_ext_my_time(header_data, hours):
     activities hours are not more than 8%, the general activities hours in ExtMyTime and the report match and if
     the specific hours in ExtMyTime and the report match."""
 
-    # This Error has to be translated to the HOURS class
-    """
-    except IndexError:
-        error_message = f"  Could not find the name '{person_data.name_irs}' in the list of names file and, consequently, the hours " \
-                        f"in the ExtMyTime couldn't be checked"
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-        return
-    """
     if almost_equal(hours.timetell_total, 0):
         error_message = "  No hours found in the TimeTell"
         print(error_message)
@@ -484,6 +462,27 @@ def check_hours_header_vs_ext_my_time(header_data, hours):
                         f"{float(general_activities_proportion):.2f}% of the total: {hours.timetell_total} hours"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    return
+
+
+def check_hours_report_vs_ttexport(header_data, hours):
+    
+    # Check hours general task
+    if not almost_equal(hours.ttexported_general, hours.timetell_general):
+        error_message = f"  The General Activities task declared in section 2.4 ({hours.timetell_general}) are not " \
+                        f" coincident with those declared TimeTell({float(hours.ttexported_general):.2f}) "
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    
+    # Check hours specific tasks
+    for task_code in hours.timetell_specific.keys():
+        if str(task_code) not in hours.ttexported_specific.keys():
+            hours.ttexported_specific[task_code] = 0
+        if not almost_equal(hours.timetell_specific[task_code], hours.ttexported_specific[str(task_code)]):
+            error_message = f"  The hours of Specific Task {task_code} in section 2.4 ({hours.timetell_specific[task_code]}) "\
+                            f"are not coincident with those declared in TimeTell ({float(hours.ttexported_specific[str(task_code)]):.2f})"
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
     return
 
@@ -498,15 +497,6 @@ def check_tasks_hours_report_vs_ext_my_time(header_data, hours):
                         f"({float(hours.report_general):.2f})"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    # THIS ERROR HAS TO BE PASSED TO THE HOURS CLASS
-    """
-    except ValueError:
-        error_message = f"  The code of the General Activities Task Plan in the report does not match the valid " \
-                        f"format: {hours.report_general_taskplan}. The number of hours in the Task Plan could not be compared " \
-                        f"between ExtMyTime and the report."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    """
 
     for task_code in hours.report_taskplan_dic.keys():
         if task_code not in hours.timetell_specific.keys():
@@ -523,25 +513,46 @@ def check_tasks_hours_report_vs_ext_my_time(header_data, hours):
                             f"in the report."
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    return
 
+
+#### FUNCTIONS SECTION 7 ####
+def check_codes_sections(header_data, section, document, cell_ref, hours):
     """
-    except ValueError:
-        error_message = f"  The code of the General Activities Task Plan in the report does not match the valid " \
-                        f"format: {hours.report_general_taskplan}. The number of hours in the Task Plan could not be compared " \
-                        f"between ExtMyTime and the report."
+    Checks if the codes of tasks in the text are the same as in the Excel file (Hours Task Plan)
+
+    Parameters:
+        header_data (class): data read in the header of the document
+        folder (str): Name of folder where 'HoursTaskPlan.xlsx' is located
+        general_code (str): code of the general task in the document
+        specific_codes (list): list of the codes of the specific tasks in the document
+        name (class): configurations of the person's name
+        section (str): number of section in the document
+    """
+    general_code, specific_codes = get_codes_activities_section(document, cell_ref)
+    if general_code is None:
+        error_message = f"  No General Activity code in section {section} could be found in the report. " \
+                        f"Check if the format of the code is correct."
+        print(error_message)    
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    elif general_code != hours.report_general_taskplan:
+        error_message = f"  In section {section}, the General Activity code '{general_code}' cannot be found in " \
+                        f"the Task Plan Hours. Either the format of the code is not correct or the number of the " \
+                        f"activity code is not correct."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    """
-    
-    """
-    # THIS ERROR HAS TO BE TRANSLATED TO THE HOURS CLASS
-    except ValueError:
-        error_message = f"  The code of a Specific Task Plan in the report does not match the valid format: " \
-                        f"{specific_task}. The number of hours in the Task Plan could not be compared between " \
-                        f"ExtMyTime and the report."
+    if len(specific_codes) == 0:
+        error_message = f"  No Specific Activity code in section {section} could be found in the report. " \
+                        f"Check if the format of the code is correct."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    """
+    for code in specific_codes:
+        if not int(code) in hours.timetell_specific.keys():
+            error_message = f"  In section {section}, the Specific Activity code '{code}' cannot be found in the" \
+                            f"Task Plan Hours. Either the format of the code is not correct or the number of the" \
+                            f"activity code is not correct."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     return
 
 
@@ -576,72 +587,6 @@ def get_codes_activities_section(document, cell_ref):
             specific_taskplans_codes = specific_taskplans_codes + [line[line.find("(") + 1:line.find(")")]]
 
     return general_taskplan_code, specific_taskplans_codes
-
-
-def check_codes_sections(header_data, section, document, cell_ref, hours):
-    """
-    Checks if the codes of tasks in the text are the same as in the Excel file (Hours Task Plan)
-
-    Parameters:
-        header_data (class): data read in the header of the document
-        folder (str): Name of folder where 'HoursTaskPlan.xlsx' is located
-        general_code (str): code of the general task in the document
-        specific_codes (list): list of the codes of the specific tasks in the document
-        name (class): configurations of the person's name
-        section (str): number of section in the document
-    """
-    general_code, specific_codes = get_codes_activities_section(document, cell_ref)
-    print(general_code)
-    print(specific_codes)
-    if general_code is None:
-        error_message = f"  No General Activity code in section {section} could be found in the report. " \
-                        f"Check if the format of the code is correct."
-        print(error_message)    
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    elif general_code != hours.report_general_taskplan:
-        error_message = f"  In section {section}, the General Activity code '{general_code}' cannot be found in " \
-                        f"the Task Plan Hours. Either the format of the code is not correct or the number of the " \
-                        f"activity code is not correct."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    if len(specific_codes) == 0:
-        error_message = f"  No Specific Activity code in section {section} could be found in the report. " \
-                        f"Check if the format of the code is correct."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    for code in specific_codes:
-        if not int(code) in hours.timetell_specific.keys():
-            error_message = f"  In section {section}, the Specific Activity code '{code}' cannot be found in the" \
-                            f"Task Plan Hours. Either the format of the code is not correct or the number of the" \
-                            f"activity code is not correct."
-            print(error_message)
-            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-
-    # THIS ERROR HAS TO BE PASSED TO THE HOURS CLASS
-    """
-    if len(hours_person) == 0:
-        error_message = f"  The name of the person {person_data}, could not be found in the list with the hours in " \
-                        f"ExtMyTime. The correspondence of the codes in section 2.2 and 2.4 with the Task Plan " \
-                        f"could not be checked."
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    """
-    return
-
-
-def check_filename(filename, header_data):
-    """
-    Checks if the name of the file follows the structure
-
-    Arguments:
-        filename (str): name of the file
-    """
-    name_split = filename.split()
-    if name_split[1] != "Monthly" or name_split[2] != "Report":
-        error_message = f"  The name of the file is not according to the template. It should be as follows: " \
-                        f"'F4E-OMF-1159-01-01-XX Monthly Report Name Surname #YY MZZ 2023.docx'"
-        print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
 
 def check_dates_section3(document, header_data):
@@ -684,6 +629,14 @@ def check_dates_section3(document, header_data):
 
     return
 
+
+def forbidden_words(document, header_data):
+    sections = [NEW_MILESTONE, CURRENT_MILESTONE, MILESTONE_TO_COPY]
+    for section in sections:
+        check_text_forbidden_words(document.tables[section["table"]].cell(*section["cell"]).text, header_data)
+    return
+
+
 def check_text_forbidden_words(text: str, header_data):
     forbidden = ["F4E Project Manager", "F4E Manager", "F4E Line Manager", "Mindfulness"]
     for word in forbidden:
@@ -693,17 +646,9 @@ def check_text_forbidden_words(text: str, header_data):
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     return
 
-def forbidden_words(document, header_data):
-    sections = [NEW_MILESTONE, CURRENT_MILESTONE, MILESTONE_TO_COPY]
-    for section in sections:
-        check_text_forbidden_words(document.tables[section["table"]].cell(*section["cell"]).text, header_data)
-
-    return
-    
 
 def check_months_header(document, header_data):
     month = header_data.report_number.split('_')[1]
-
     for period in PERIODS:
         line = document.tables[period["table"]].cell(*period["cell"]).text
         if period["table"] == 5:
@@ -713,7 +658,6 @@ def check_months_header(document, header_data):
             error_message = f"  The month in the header of Section {period['section']} is not valid."
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    
     return
 
 
@@ -742,42 +686,26 @@ def decode_token(token):
     return dms.decode('utf-8')
 
 
-def no_errors_message(header_data) -> None:
-    if results_df[(results_df["Reference"] == header_data.f4e_reference) & 
-                   (results_df["Name"] == name_report)].empty:
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, "Monthly Report processed, no errors found."]
-    return
+#### OTHER GENERAL FUNCTIONS ####
 
 def almost_equal(float_1, float_2):
     return abs(float_1 - float_2) <= 0.0001
 
 
-def process_monthly(filename, list_employees):
-    # Read list of employees
-    
-    global name_report
-    
-    #print(f"Analyzing {filename.name}...")
-    f4e_contract = filename.name.split()[0]
-    #f4e_contract = name_file.split()[0]
-    name_report = unidecode(' '.join(filename.name.split()[3:-3]))
-    #name_report = unidecode(" ".join(name_file.split()[3:-3]))
-    #name_report = unidecode(re.match(r".+ Monthly Report (.+\s.+) #", filename).group(1))
-    document = docx.Document(filename)
-    document = accept_all_changes(document)
-    # Get header fields
-    header_data = read_header(document)
-    # Check if the name of the file follows correct structure
-    check_filename(filename.name, header_data)
-    #check_filename(name_file, header_data)
-    # Get information from LIST OF EMPLOYEES
-    person_data = PersonData(list_employees)
-    person_data.select_row(name_report)
-    # Get Hours from ExtMyTime and report
+
+#### FLOW FUNCTIONS ####
+
+def get_all_hours(document, header_data, person_data, hours_ttexport):
     hours = Hours()
-    #hours.hours_extmytime(hours_task_plan, person_data) # to be replaced by hours_declared function
     hours.hours_report(document, header_data)
     hours.hours_timetell(document)
+    hours.hours_exported(hours_ttexport, person_data)
+    return hours
+
+
+def header_checks(filename, header_data, f4e_contract, person_data):
+    # Check if the name of the file follows correct structure
+    check_filename(filename.name, header_data)
     # Shows revision number in the header
     show_version_message(header_data)
     # Checks if F4E contracts is the same in the name of the report and the header
@@ -786,11 +714,18 @@ def process_monthly(filename, list_employees):
     check_supplier_dms(header_data, person_data)
     # Check if number of report (#) is coherent with months passed from KoM
     check_report_number_against_kom_date(header_data)
-    # Check if the total number of hours in section 2.3 is the same as in the header
+    return
+
+
+def hours_checks(header_data, hours):
     check_hours_report_vs_header(header_data, hours)
     check_hours_header_vs_ext_my_time(header_data, hours)
-    # Check if hours for each task plan is the same in the report and ExtMyTime
+    check_hours_report_vs_ttexport(header_data, hours)
     check_tasks_hours_report_vs_ext_my_time(header_data, hours)
+    return
+
+
+def other_checks(document, header_data, hours):
     # Check numerical Codes of tasks in sections 2.2 and 2.5
     check_codes_sections(header_data, "2.2", document, NEW_MILESTONE, hours)
     check_codes_sections(header_data, "2.5", document, MILESTONE_TO_COPY, hours)
@@ -801,8 +736,39 @@ def process_monthly(filename, list_employees):
     # Check months headers
     check_months_header(document, header_data)
     # Check encrypted key
-    # check_encryption(document, header_data) #TO BE REINCLUDED AGAIN FOR THE NOVEMBER MR
+    check_encryption(document, header_data)
+    return
 
+
+def no_errors_message(header_data) -> None:
+    if results_df[(results_df["Reference"] == header_data.f4e_reference) & 
+                   (results_df["Name"] == name_report)].empty:
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, "Monthly Report processed, no errors found."]
+    return
+
+
+def process_monthly(filename, list_employees, hours_ttexport):
+    # Read list of employees
+    
+    global name_report
+
+    #1 Get data from the filename
+    f4e_contract, name_report = get_data_from_filename(filename)
+    #2 Open document and accept all changes
+    document = docx.Document(filename)
+    accept_all_changes(document)
+    #3 Get data from header of the report
+    header_data = read_header(document)
+    person_data = PersonData(list_employees)
+    person_data.select_row(name_report)
+    #4 Get hours
+    hours = get_all_hours(document, header_data, person_data, hours_ttexport)
+    #5 Header checks
+    header_checks(filename, header_data, f4e_contract, person_data)
+    #6 Hours checks
+    hours_checks(header_data, hours)
+    #7 Other checks
+    other_checks(document, header_data, hours)
     # If no error message, add note saying everything is ok
     no_errors_message(header_data)
 
