@@ -621,7 +621,7 @@ def check_dates_section3(document, header_data):
     month_section3 = int(date[1])
     day_section3 = int(date[0])
     year_section3 = int(date[2])
-    if (month_header+1) % 12 != month_section3:
+    if (month_header % 12) + 1 != month_section3:
         error_message = f"  The month in Section 3 ({month_section3}) does not correspond to the following month " \
                         f"of the month being reported ({month_header})."
         print(error_message)
