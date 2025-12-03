@@ -156,11 +156,13 @@ class PersonData:
         #self.row_data = self.df[self.df["Name Monthly/Mission"].astype(str).apply(unidecode) == unidecode(name_report)]
         if name_report == "Raul del Val":
             name_report = "Raul Del Val"
+        print(unidecode(name_report))
         self.row_data = self.df[self.df["Employee"].astype(str).apply(unidecode) == unidecode(name_report)]
         self.define_data()
         return
     
     def define_data(self):
+        print(self.row_data["Specific Contract"])
         self.contract = self.row_data["Specific Contract"].values[0].strip()
         #self.kom = self.row_data["KoM"].values[0]
         self.kom = self.row_data["Kick-Off Meeting"].values[0]
@@ -205,23 +207,31 @@ class Hours:
         self.emt_specific = dict(zip(hours_specific["Task Plan Code"], hours_specific["Total Working hours submitted"]))
         return
     """
-    def hours_exported(self, hours_ttexport, person_data):
+    def hours_exported(self, hours_ttexport, person_data, header_data):
         self.ttexported_general = 0
         self.ttexported_specific = {}
         #hours_tt = hours_ttexport[hours_ttexport["Employee name"].astype(str).apply(unidecode).isin([person_data.name_timetell, person_data.name_monthly])]
         hours_ttexport['name_tt'] = hours_ttexport["Employee name"].str.split(",").str[1].str[1:] + " " + hours_ttexport["Employee name"].str.split(",").str[0]
         hours_tt = hours_ttexport[hours_ttexport["name_tt"].astype(str).apply(unidecode) == person_data.name_atg]
-
+        print(hours_ttexport["name_tt"].astype(str).apply(unidecode))
+        print(unidecode(person_data.name_atg))
+        if len(hours_tt) == 0:
+            error_message = f"  The name '{person_data.name_atg}' could not be found in the TimeTell export file and, consequently, the hours " \
+                            f"couldn't be checked"
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+            return True
         #hours_tt = hours_ttexport[hours_ttexport["Employee name"].astype(str).apply(unidecode) == 'Ferrater Roca, Marc']
         hours_tt['Activity name'] = hours_tt['Activity name'].str.replace('Task: ', '', regex=False)
         
         tasks_hours = hours_tt[['Hours', 'Activity name']].groupby('Activity name').sum()
-        print(tasks_hours)
+        
+
         self.ttexported_specific = tasks_hours.to_dict()['Hours']
         self.ttexported_general = self.ttexported_specific[self.report_general_taskplan]
         self.ttexported_specific.pop(self.report_general_taskplan)
         print(self.ttexported_specific)
-        return
+        return False
 
     def hours_timetell(self, document):
         
@@ -699,8 +709,8 @@ def get_all_hours(document, header_data, person_data, hours_ttexport):
     hours = Hours()
     hours.hours_report(document, header_data)
     hours.hours_timetell(document)
-    hours.hours_exported(hours_ttexport, person_data)
-    return hours
+    hours_flag = hours.hours_exported(hours_ttexport, person_data, header_data)
+    return hours, hours_flag
 
 
 def header_checks(filename, header_data, f4e_contract, person_data):
@@ -762,11 +772,12 @@ def process_monthly(filename, list_employees, hours_ttexport):
     person_data = PersonData(list_employees)
     person_data.select_row(name_report)
     #4 Get hours
-    hours = get_all_hours(document, header_data, person_data, hours_ttexport)
+    hours, hours_flag = get_all_hours(document, header_data, person_data, hours_ttexport)
     #5 Header checks
     header_checks(filename, header_data, f4e_contract, person_data)
     #6 Hours checks
-    hours_checks(header_data, hours)
+    if not hours_flag:
+        hours_checks(header_data, hours)
     #7 Other checks
     other_checks(document, header_data, hours)
     # If no error message, add note saying everything is ok
