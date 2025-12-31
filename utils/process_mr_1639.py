@@ -75,8 +75,8 @@ def process_mr_1639(mr_files, hours_timetell):
     results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
     #hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
     hours_timetell = pd.read_excel(hours_timetell)
-    list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\OMF-1639 version\LIST OF EMPLOYEES 1639.xlsx")
-    #list_employees = pd.read_excel("LIST OF EMPLOYEES 1639.xlsx")
+    #list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\OMF-1639 version\LIST OF EMPLOYEES 1639.xlsx")
+    list_employees = pd.read_excel("LIST OF EMPLOYEES 1639.xlsx")
     #list_employees = list_employees[list_employees["Contract status"] == "Active"]
     for report in mr_files:
         process_monthly(report, list_employees, hours_timetell)
