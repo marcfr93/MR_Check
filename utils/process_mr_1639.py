@@ -34,8 +34,19 @@ TO_HIGHLIGHT = [
 ]
 KEY_ENCRYPTED = {"table": 7, "cell": (3, 0)}
 KEY_ENCRYPTED_SIDE = {"table": 7, "cell": (3, 1)}
-
 HOURS_TABLE = {"table": 4, "cell": (1, 1)}
+
+"""# PATTERNS
+month_number_pat = re.compile(r"M\d+")
+date_pat = re.compile(r"(\d{2})/(\d{2})/(\d{4})")
+period_pat = re.compile(r"\d{2}/\d{2}/\d{4}\s*[-–]\s*\d{2}/\d{2}/\d{4}")
+pat_file_name = re.compile(r"#\d+\s+M\d+\s+\d+")
+#
+pat_task = re.compile(r"Task\s+\d+\s\(\d+\)")
+pat_number = re.compile(r"\(\d+\)")
+pat_hours = re.compile(r"[\d\.]+\s+hours")
+
+re.search(r"task.+:\s*(\d+([,.]\d+)?)\s*hours?\s*", section.lower())"""
 
 FOLDER = "test_data"
 MONTH_NUMBER_TO_NAME = {
@@ -64,16 +75,13 @@ def process_mr_1639(mr_files, hours_timetell):
     results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
     #hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
     hours_timetell = pd.read_excel(hours_timetell)
-    #list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\webapp\Development\LIST OF EMPLOYEES.xlsx")
-    list_employees = pd.read_excel("LIST OF EMPLOYEES 1639.xlsx")
+    list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\OMF-1639 version\LIST OF EMPLOYEES 1639.xlsx")
+    #list_employees = pd.read_excel("LIST OF EMPLOYEES 1639.xlsx")
     #list_employees = list_employees[list_employees["Contract status"] == "Active"]
     for report in mr_files:
         process_monthly(report, list_employees, hours_timetell)
 
     return results_df
-
-
-
 
 
 #### FUNCTIONS PART 1 ####
@@ -153,7 +161,6 @@ class PersonData:
         self.row_data = None
 
     def select_row(self, name_report):
-        #self.row_data = self.df[self.df["Name Monthly/Mission"].astype(str).apply(unidecode) == unidecode(name_report)]
         if name_report == "Raul del Val":
             name_report = "Raul Del Val"
         print(unidecode(name_report))
@@ -162,13 +169,9 @@ class PersonData:
         return
     
     def define_data(self):
-        print(self.row_data["Specific Contract"])
         self.contract = self.row_data["Specific Contract"].values[0].strip()
-        #self.kom = self.row_data["KoM"].values[0]
         self.kom = self.row_data["Kick-Off Meeting"].values[0]
-        #self.name_monthly = unidecode(self.row_data["Name Monthly/Mission"].values[0])
         self.name_monthly = unidecode(self.row_data["Employee"].values[0])
-        #self.name_irs = unidecode(self.row_data["Name IRS"].values[0])
         self.name_irs = unidecode(self.row_data["Employee"].values[0])
         self.name_atg = unidecode(self.row_data["ATG Account Name"].values[0])
         return
@@ -178,116 +181,138 @@ class PersonData:
         return
     
 
-
 class Hours:
     def __init__(self):
-        self.timetell_general = None
-        self.timetell_specific = None
-        self.timetell_total = None
-        self.report_total = None
-        self.report_general = None
-        self.report_specific = None
-        self.report_taskplan_dic = None
-        self.general_code = None
-    """
-    def hours_extmytime(self, hours_task_plan, person_data):
-        hours_emt = hours_task_plan[hours_task_plan["Full Name"].apply(unidecode).isin([person_data.name_irs, person_data.name_monthly])]
-        if len(hours_emt) == 0:
-            error_message = f"  The name '{person_data.name_irs}' could not be found in the ExtMyTime file and, consequently, the hours " \
-                            f"couldn't be checked"
-            print(error_message)
-            results_df.loc[len(results_df)] = [person_data.contract, name_report, error_message[2:]]
-            self.emt_total = 0
-            self.emt_general = 0
-            self.emt_specific = {}
-            return
-        self.emt_total = hours_emt["Total Working hours submitted"].sum()
-        self.emt_general = hours_emt[hours_emt["Task Plan Description"].str.contains("General Activities")]["Total Working hours submitted"].values[0]
-        hours_specific = hours_emt[~hours_emt["Task Plan Description"].str.contains("General Activities")]
-        self.emt_specific = dict(zip(hours_specific["Task Plan Code"], hours_specific["Total Working hours submitted"]))
-        return
-    """
-    def hours_exported(self, hours_ttexport, person_data, header_data):
+        self.table24_general = None
+        self.table24_specific = None
+        self.table24_total = None
+        self.report23_total = None
+        self.report23_general = None
+        self.report23_specific = None
+        self.report23_taskplan_dic = None
+        self.report23_general_taskplan = None
+        self.ttexported_general = None
+        self.ttexported_specific = None
+        self.ndays_worked = None
+    
+    def hours_timetell_export(self, hours_ttexport, person_data, header_data):
+        """Get hours from Excel file exported from TimeTell"""
         self.ttexported_general = 0
         self.ttexported_specific = {}
-        #hours_tt = hours_ttexport[hours_ttexport["Employee name"].astype(str).apply(unidecode).isin([person_data.name_timetell, person_data.name_monthly])]
+        
+        #format and clean dataframe
+        hours_ttexport = self._clean_timetell_df(hours_ttexport)
+        
+        #create new column changing name format
         hours_ttexport['name_tt'] = hours_ttexport["Employee name"].str.split(",").str[1].str[1:] + " " + hours_ttexport["Employee name"].str.split(",").str[0]
+        
+        #filter by name
         hours_tt = hours_ttexport[hours_ttexport["name_tt"].astype(str).apply(unidecode) == person_data.name_atg]
-        print(hours_ttexport["name_tt"].astype(str).apply(unidecode))
-        print(unidecode(person_data.name_atg))
+        
+        #create error if no hours
         if len(hours_tt) == 0:
             error_message = f"  The name '{person_data.name_atg}' could not be found in the TimeTell export file and, consequently, the hours " \
                             f"couldn't be checked"
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
             return True
-        #hours_tt = hours_ttexport[hours_ttexport["Employee name"].astype(str).apply(unidecode) == 'Ferrater Roca, Marc']
-        hours_tt['Activity name'] = hours_tt['Activity name'].str.replace('Task: ', '', regex=False)
         
+        # Delete word Task and calculate total hours per task. 
         tasks_hours = hours_tt[['Hours', 'Activity name']].groupby('Activity name').sum()
-        
-
         self.ttexported_specific = tasks_hours.to_dict()['Hours']
-        self.ttexported_general = self.ttexported_specific[self.report_general_taskplan]
-        self.ttexported_specific.pop(self.report_general_taskplan)
-        print(self.ttexported_specific)
+
+        # Calculate number of days worked in the period
+        self.ndays_worked = hours_tt['Date'].nunique()
+
+        self.ttexported_general = self.ttexported_specific[self.report23_general_taskplan]
+        self.ttexported_specific.pop(self.report23_general_taskplan)
+
         return False
 
-    def hours_timetell(self, document):
-        
-        self.timetell_general = 0
-        self.timetell_specific = {} 
+    def hours_table_section_24(self, document):
+        """Get hours from table in section 2.4 of the MR"""
+        self.table24_general = 0
+        self.table24_specific = {}
         hours_table = document.tables[HOURS_TABLE["table"]].cell(*HOURS_TABLE["cell"]).tables[0]
 
         # ERROR IN CASE THE TABLE IS NOT FOUND
 
         for row in hours_table.rows[1:]:
+            #Change '.' to ',' in hours and transform to float
             hours_task = float(row.cells[5].text.strip().replace(",", "."))
-            key = int(row.cells[2].text.strip())
+            key = str(row.cells[2].text.strip())
+            #add line by line the hours in each task. 
             if "Total".casefold() in row.cells[0].text.strip().casefold():
                 continue
-            if str(key) == self.report_general_taskplan:
-                self.timetell_general += hours_task
-            elif key in self.timetell_specific:
-                self.timetell_specific[key] += hours_task
+            if key == self.report23_general_taskplan:
+                self.table24_general += hours_task
+            elif key in self.table24_specific:
+                self.table24_specific[key] += hours_task
             else:
-                self.timetell_specific[key] = hours_task
-            #self.timetell_specific[row.cells[1].text] += hours_task
-            #if "General Activities".casefold() in row.cells[1].text.strip().casefold():
-            #    self.timetell_general += hours_task
-            #else:
-            #    task_code = int(re.search(r"\((\d+)\)", row.cells[1].text.strip()).group(1))
-            #    self.timetell_specific[task_code] = hours_task
-            #except ValueError:
-            #    error_message = f"  The number of hours in the line '{row.cells[1].text.strip()}' could not be transformed to a number."
-        self.timetell_total = self.timetell_general + sum(self.timetell_specific.values())
+                self.table24_specific[key] = hours_task
+        self.table24_total = self.table24_general + sum(self.table24_specific.values())
 
         return
 
-    def hours_report(self, document, header_data):
-        self.report_general = 0
-        self.report_specific = 0
-        #self.report_total = 0
-        self.report_general_taskplan = ""
-        self.report_taskplan_dic = {}
+    def hours_section_23(self, document, header_data):
+        """Get hours reported in section 2.3 of the MR"""
+        self.report23_general = 0
+        self.report23_specific = 0
+        self.report23_general_taskplan = ""
+        self.report23_taskplan_dic = {}
         i = 0
         section = document.tables[CURRENT_MILESTONE["table"]].cell(*CURRENT_MILESTONE["cell"]).text
+        """section = document.tables[CURRENT_MILESTONE["table"]].cell(*CURRENT_MILESTONE["cell"])
+        pat_task = re.compile(r"Task\s+\d+\s\(\d+\)")
+        pat_number = re.compile(r"\(\d+\)")
+        pat_hours = re.compile(r"[\d\.]+\s+hours")
+        for par in section.paragraphs:
+            # if it finds a task pattern in the paragraph
+            if pat_task.search(par.text) is not None:
+                # identify the task code
+                try:
+                    task = pat_number.search(par.text).group().strip("(").strip(")")
+                except AttributeError:
+                    raise RuntimeError(f"Could not find a task number in {par.text}")
+                # get the hours
+                try:
+                    hours = pat_hours.search(par.text).group().strip(" hours")
+                    hours = float(hours)
+                    
+                except AttributeError:
+                    raise RuntimeError(f"Could not find hours in {par.text}")
+                # assign hours to task code. 
+                if "General Activities".casefold() in par.text.casefold():
+                    self.report23_general += hours
+                    self.report23_general_taskplan = task
+                else:
+                    self.report23_specific += hours
+                    self.report23_taskplan_dic[task] = hours
+        self.report23_total = self.report23_general + self.report23_specific
+        return"""
+
+        
         while True and i < 10:
+            # look for the line where task is reported
             try:
                 match = re.search(r"task.+:\s*(\d+([,.]\d+)?)\s*hours?\s*", section.lower())
                 section = section[match.span()[1]:]
             except AttributeError:
                 break
+
+            #get hours
             hours_task = match.group(1).replace(",", ".")
             line = match.group(0)
+
+            # assign hours to task code. 
             try:
                 hours_task = float(hours_task)
                 if "General Activities".casefold() in line.casefold():
-                    self.report_general += hours_task
-                    self.report_general_taskplan = line[line.find("(") + 1:line.find(")")]
+                    self.report23_general += hours_task
+                    self.report23_general_taskplan = line[line.find("(") + 1:line.find(")")]
                 else:
-                    self.report_specific += hours_task
-                    self.report_taskplan_dic[int(line[line.find("(") + 1:line.find(")")])] = hours_task
+                    self.report23_specific += hours_task
+                    self.report23_taskplan_dic[line[line.find("(") + 1:line.find(")")]] = hours_task
             except ValueError:
                 error_message = f"  The number of hours in the line '{line}' could not be transformed to a number." \
                                 f"Check if it is written correctly. The hours of that task could not be processed and," \
@@ -295,11 +320,35 @@ class Hours:
                 print(error_message)
                 results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
             
-        self.report_total = self.report_general + self.report_specific
+        self.report23_total = self.report23_general + self.report23_specific
         i += 1
 
         return
 
+
+    def _clean_timetell_df(self, df):
+        """Cleans the dataframe imported from TimeTell export"""
+        # Drop columns not needed
+        df.drop(columns=['Client name', 'Organization name', 'Info', 'Year', 'Month'], inplace=True, errors='ignore')
+        # filter to more than 0 hours and nan values
+        df = df.dropna(subset=['Hours'])
+        df = df[df['Hours'] > 0]
+        #round hours to 2 decimals
+        df['Hours'] = df['Hours'].round(2)
+        # Conditioning of columns
+        df['Activity name'] = df['Activity name'].astype(str)
+        df['From time'] = df['From time'].dt.round('min')
+        df['To time'] = df['To time'].dt.round('min')
+        #delete row if no name present
+        df = df[df['Employee name'].notna()].reset_index(drop=True)
+        print(df)
+        # filter only activities of the project
+        mask_activities = df['Project name'].str.contains('F4E-OMF-1639-01')
+        df = df[mask_activities].reset_index()
+        # Delete word 'Task: ' from activity name
+        df['Activity name'] = df['Activity name'].astype(str).str.replace('Task: ', '', regex=False)
+        df['Activity name'] = df['Activity name'].astype(float).astype(int).astype(str)
+        return df
 
 #### FUNCTIONS PART 3 ####
 def read_header(document):
@@ -439,88 +488,112 @@ def diff_month(d1, d2):
 #### FUNCTIONS SECTION 6 ####
 
 def check_hours_report_vs_header(header_data, hours):
-    """Check if the number of total hours in the report is the same as the sum of the general activities and the
-    specific tasks in the report"""
+    """Check if the hours declared in the header of the report are equal to the
+    sum of the hours declared in section 2.3 of the report"""
     
     # Check if sum of hours in the report is the same as in the header
-    if not almost_equal(float(header_data.reported_hours), hours.report_total):
-        error_message = f"  The sum of hours of the tasks ({hours.report_total}) is not the same as the one found " \
+    if not almost_equal(float(header_data.reported_hours), hours.report23_total):
+        error_message = f"  The sum of hours of the tasks ({hours.report23_total}) "\
+                        f"declared in section 2.3 is not the same as the one found " \
                         f"in the header ({header_data.reported_hours})"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     return 
 
 
-def check_hours_header_vs_ext_my_time(header_data, hours):
-    """Check if there are hours in ExtMyTime, the total hours match between ExtMyTime and the report, the general
-    activities hours are not more than 8%, the general activities hours in ExtMyTime and the report match and if
-    the specific hours in ExtMyTime and the report match."""
+def other_checks_hours(header_data, hours):
+    """Perform other checks on the hours:
+    -check if total hours in section 2.4 is bigger than 0
+    -check if total hours in header match those in section 2.4
+    -check if general activities hours are more than 8%
+    -check if average hours is bigger than 8 per day"""
 
-    if almost_equal(hours.timetell_total, 0):
-        error_message = "  No hours found in the TimeTell"
+    #Check if total hours section 2.4 is bigger than 0
+    if almost_equal(hours.table24_total, 0):
+        error_message = "  No hours declared in section 2.4 of the report."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-        return
-    if not almost_equal(float(header_data.reported_hours), hours.timetell_total):
-        error_message = f"  The total hours as found in the report ({header_data.reported_hours}) don't match the " \
-                        f"TimeTell hours ({hours.timetell_total})"
+
+
+    #Check if total hours in header match those in section 2.4
+    if not almost_equal(float(header_data.reported_hours), hours.table24_total):
+        error_message = f"  The total hours reported in the header ({header_data.reported_hours}) don't match the " \
+                        f"total hours reported in section 2.4({hours.table24_total})"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    general_activities_proportion = hours.timetell_general / hours.timetell_total * 100
+    
+    #Check if general activities hours are more than 8%
+    general_activities_proportion = hours.table24_general / hours.table24_total * 100
     if general_activities_proportion > 8:
-        error_message = f"  The General Activities task {hours.report_general_taskplan} took {float(hours.timetell_general):.2f} hours, which is a " \
-                        f"{float(general_activities_proportion):.2f}% of the total: {hours.timetell_total} hours"
+        error_message = f"  The General Activities task {hours.report23_general_taskplan} took {float(hours.table24_general):.2f} hours, which is a " \
+                        f"{float(general_activities_proportion):.2f}% of the total: {hours.table24_total} hours"
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+
+    #check if average hours is bigger than 8 per day
+    if (hours.table24_total / hours.ndays_worked) > 8:
+        error_message = f"  The total hours reported in section 2.4 is {hours.table24_total}, " \
+                        f"which gives an average of more than 8 hours per day worked."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     return
 
 
 def check_hours_report_vs_ttexport(header_data, hours):
+    """Check if the hours for each task plan is coincident between the table
+    in section 2.4 of the report and the hours exported from Timetell"""
     
     # Check hours general task
-    if not almost_equal(hours.ttexported_general, hours.timetell_general):
-        error_message = f"  The General Activities task declared in section 2.4 ({hours.timetell_general}) are not " \
+    if not almost_equal(hours.ttexported_general, hours.table24_general):
+        error_message = f"  The General Activities task declared in section 2.4 ({hours.table24_general}) are not " \
                         f" coincident with those declared TimeTell({float(hours.ttexported_general):.2f}) "
         print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, 
+                                           name_report, error_message[2:]]
+
     # Check hours specific tasks
-    for task_code in hours.timetell_specific.keys():
-        if str(task_code) not in hours.ttexported_specific.keys():
+    for task_code in hours.table24_specific.keys():
+        if task_code not in hours.ttexported_specific.keys():
             hours.ttexported_specific[task_code] = 0
-        if not almost_equal(hours.timetell_specific[task_code], hours.ttexported_specific[str(task_code)]):
-            error_message = f"  The hours of Specific Task {task_code} in section 2.4 ({hours.timetell_specific[task_code]}) "\
-                            f"are not coincident with those declared in TimeTell ({float(hours.ttexported_specific[str(task_code)]):.2f})"
+        if not almost_equal(hours.table24_specific[task_code], hours.ttexported_specific[task_code]):
+            error_message = f"  The hours of Specific Task {task_code} in section 2.4 ({hours.table24_specific[task_code]}) "\
+                            f"are not coincident with those declared in TimeTell ({float(hours.ttexported_specific[task_code]):.2f})"
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
     return
 
 
-def check_tasks_hours_report_vs_ext_my_time(header_data, hours):
-    """Check if the hours for each task plan is coincident between the report and ExtMyTime"""
+def check_tasks_hours_report_vs_timetell(header_data, hours):
+    """Check if the hours declared in section 2.3 and 2.4 of the report are 
+    coincident"""
+
     # Check the general activities task
-    float(hours.report_general_taskplan)
-    if not almost_equal(hours.timetell_general, hours.report_general):
-        error_message = f"  The General Activities task {hours.report_general_taskplan} hours in TimeTell ({float(hours.timetell_general):.2f}) " \
-                        f"is not coincident with the ones declared in the report " \
-                        f"({float(hours.report_general):.2f})"
+    float(hours.report23_general_taskplan)
+    if not almost_equal(hours.table24_general, hours.report23_general):
+        error_message = f"  The General Activities task {hours.report23_general_taskplan} hours "\
+                        f"declared in the table of section 2.4 ({float(hours.table24_general):.2f}) " \
+                        f"are not coincident with the ones declared in section 2.3 " \
+                        f"({float(hours.report23_general):.2f})"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
-    for task_code in hours.report_taskplan_dic.keys():
-        if task_code not in hours.timetell_specific.keys():
-            hours.timetell_specific[task_code] = 0
-        if not almost_equal(hours.timetell_specific[task_code], hours.report_taskplan_dic[task_code]):
-            error_message = f"  The hours of Specific Task {task_code} in TimeTell " \
-                            f"({float(hours.timetell_specific[task_code]):.2f}) are not coincident with the ones declared " \
-                            f"in the report ({float(hours.report_taskplan_dic[task_code]):.2f})"
+    # Check the specific tasks
+    for task_code in hours.report23_taskplan_dic.keys():
+        if task_code not in hours.table24_specific.keys():
+            hours.table24_specific[task_code] = 0
+        if not almost_equal(hours.table24_specific[task_code], hours.report23_taskplan_dic[task_code]):
+            error_message = f"  The Specific task {task_code} hours declared in the table"\
+                            f" of section 2.4 ({float(hours.table24_specific[task_code]):.2f}) "\
+                            f"are not coincident with the ones declared in section 2.3 " \
+                            f"({float(hours.report23_taskplan_dic[task_code]):.2f})"
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    for task_code in hours.timetell_specific.keys():
-        if task_code not in hours.report_taskplan_dic.keys():
-            error_message = f"  The hours of Specific Task {task_code} in TimeTell were not declared " \
-                            f"in the report."
+    for task_code in hours.table24_specific.keys():
+        if task_code not in hours.report23_taskplan_dic.keys():
+            error_message = f"  The hours of Specific Task {task_code} in TimeTell were " \
+                            f"declared in section 2.4 ({float(hours.table24_specific[task_code]):.2f}) but not " \
+                            f"in section 2.3 of the report."
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     return
@@ -545,7 +618,7 @@ def check_codes_sections(header_data, section, document, cell_ref, hours):
                         f"Check if the format of the code is correct."
         print(error_message)    
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
-    elif general_code != hours.report_general_taskplan:
+    elif general_code != hours.report23_general_taskplan:
         error_message = f"  In section {section}, the General Activity code '{general_code}' cannot be found in " \
                         f"the Task Plan Hours. Either the format of the code is not correct or the number of the " \
                         f"activity code is not correct."
@@ -557,8 +630,8 @@ def check_codes_sections(header_data, section, document, cell_ref, hours):
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     for code in specific_codes:
-        if not int(code) in hours.timetell_specific.keys():
-            error_message = f"  In section {section}, the Specific Activity code '{code}' cannot be found in the" \
+        if not code in hours.table24_specific.keys():
+            error_message = f"  In section {section}, the Specific Activity code '{code}' cannot be found in the " \
                             f"Task Plan Hours. Either the format of the code is not correct or the number of the" \
                             f"activity code is not correct."
             print(error_message)
@@ -621,7 +694,8 @@ def check_dates_section3(document, header_data):
     month_section3 = int(date[1])
     day_section3 = int(date[0])
     year_section3 = int(date[2])
-    if (month_header % 12) + 1 != month_section3:
+    print(month_section3, month_header)
+    if (month_header%12) + 1 != month_section3:
         error_message = f"  The month in Section 3 ({month_section3}) does not correspond to the following month " \
                         f"of the month being reported ({month_header})."
         print(error_message)
@@ -707,9 +781,9 @@ def almost_equal(float_1, float_2):
 
 def get_all_hours(document, header_data, person_data, hours_ttexport):
     hours = Hours()
-    hours.hours_report(document, header_data)
-    hours.hours_timetell(document)
-    hours_flag = hours.hours_exported(hours_ttexport, person_data, header_data)
+    hours.hours_section_23(document, header_data)
+    hours.hours_table_section_24(document)
+    hours_flag = hours.hours_timetell_export(hours_ttexport, person_data, header_data)
     return hours, hours_flag
 
 
@@ -729,9 +803,9 @@ def header_checks(filename, header_data, f4e_contract, person_data):
 
 def hours_checks(header_data, hours):
     check_hours_report_vs_header(header_data, hours)
-    check_hours_header_vs_ext_my_time(header_data, hours)
+    other_checks_hours(header_data, hours)
     check_hours_report_vs_ttexport(header_data, hours)
-    check_tasks_hours_report_vs_ext_my_time(header_data, hours)
+    check_tasks_hours_report_vs_timetell(header_data, hours)
     return
 
 
