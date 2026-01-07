@@ -226,6 +226,11 @@ class Hours:
         tasks_hours = hours_tt[['Hours', 'Activity name']].groupby('Activity name').sum()
         self.ttexported_specific = tasks_hours.to_dict()['Hours']
 
+        # Days with more than 10 hours worked
+        daily_hours = hours_tt[['Hours', 'Date']].groupby('Date').sum()
+        days_over_10h = daily_hours[daily_hours['Hours'] > 10]
+        self.days_over_10h = days_over_10h.index.tolist()
+
         # Calculate number of days worked in the period
         self.ndays_worked = hours_tt['Date'].nunique()
 
@@ -337,12 +342,10 @@ class Hours:
         df.drop(columns=['Client name', 'Organization name', 'Info', 'Year', 'Month'], inplace=True, errors='ignore')
         #delete row if no name present
         df = df[df['Employee name'].notna()].reset_index(drop=True)
-
         # filter only activities of the project
         df = df[df['Project name'].notna()]
         mask_activities = df['Project name'].str.contains('F4E-OMF-1639')
         df = df[mask_activities].reset_index()
-        
         # filter to more than 0 hours and nan values
         df = df.dropna(subset=['Hours'])
         df = df[df['Hours'] > 0]
@@ -544,6 +547,15 @@ def other_checks_hours(header_data, hours):
                         f"which gives an average of more than 8 hours per day worked."
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+
+    # check days with more than 10 hours worked
+    if len(hours.days_over_10h) > 0:
+        error_message = f"  There are {len(hours.days_over_10h)} days with more than 10 hours worked: "
+        for day in hours.days_over_10h:
+            error_message += f"{day.strftime('%d/%m/%Y')} "
+        print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    
     return
 
 
