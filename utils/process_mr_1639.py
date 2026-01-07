@@ -347,6 +347,7 @@ class Hours:
         df = df.dropna(subset=['Hours'])
         df = df[df['Hours'] > 0]
         #round hours to 2 decimals
+        df['Hours'] = df['Hours'].astype(float)
         df['Hours'] = df['Hours'].round(2)
         # Conditioning of columns
         df['Activity name'] = df['Activity name'].astype(str)
