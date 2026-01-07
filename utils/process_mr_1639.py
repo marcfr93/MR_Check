@@ -202,6 +202,11 @@ class Hours:
         
         #format and clean dataframe
         hours_ttexport = self._clean_timetell_df(hours_ttexport)
+        if len(hours_ttexport) == 0:
+            error_message = f"  The TimeTell export file does not contain any hours for the project F4E-OMF-1639"
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+            return True
         
         #create new column changing name format
         hours_ttexport['name_tt'] = hours_ttexport["Employee name"].str.split(",").str[1].str[1:] + " " + hours_ttexport["Employee name"].str.split(",").str[0]
@@ -330,6 +335,14 @@ class Hours:
         """Cleans the dataframe imported from TimeTell export"""
         # Drop columns not needed
         df.drop(columns=['Client name', 'Organization name', 'Info', 'Year', 'Month'], inplace=True, errors='ignore')
+        #delete row if no name present
+        df = df[df['Employee name'].notna()].reset_index(drop=True)
+
+        # filter only activities of the project
+        df = df[df['Project name'].notna()]
+        mask_activities = df['Project name'].str.contains('F4E-OMF-1639')
+        df = df[mask_activities].reset_index()
+        
         # filter to more than 0 hours and nan values
         df = df.dropna(subset=['Hours'])
         df = df[df['Hours'] > 0]
@@ -339,12 +352,6 @@ class Hours:
         df['Activity name'] = df['Activity name'].astype(str)
         df['From time'] = df['From time'].dt.round('min')
         df['To time'] = df['To time'].dt.round('min')
-        #delete row if no name present
-        df = df[df['Employee name'].notna()].reset_index(drop=True)
-        print(df)
-        # filter only activities of the project
-        mask_activities = df['Project name'].str.contains('F4E-OMF-1639-01')
-        df = df[mask_activities].reset_index()
         # Delete word 'Task: ' from activity name
         df['Activity name'] = df['Activity name'].astype(str).str.replace('Task: ', '', regex=False)
         df['Activity name'] = df['Activity name'].astype(float).astype(int).astype(str)
