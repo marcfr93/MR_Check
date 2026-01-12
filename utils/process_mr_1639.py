@@ -164,7 +164,7 @@ class PersonData:
         if name_report == "Raul del Val":
             name_report = "Raul Del Val"
         print(unidecode(name_report))
-        self.row_data = self.df[self.df["Employee"].astype(str).apply(unidecode) == unidecode(name_report)]
+        self.row_data = self.df[self.df["Employee"].astype(str).apply(unidecode).str.lower() == unidecode(name_report).lower()]
         self.define_data()
         return
     
