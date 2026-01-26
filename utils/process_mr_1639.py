@@ -210,7 +210,7 @@ class Hours:
         
         #create new column changing name format
         hours_ttexport['name_tt'] = hours_ttexport["Employee name"].str.split(",").str[1].str[1:] + " " + hours_ttexport["Employee name"].str.split(",").str[0]
-        
+        print(person_data.name_atg)
         #filter by name
         hours_tt = hours_ttexport[hours_ttexport["name_tt"].astype(str).apply(unidecode) == person_data.name_atg]
         
@@ -233,7 +233,7 @@ class Hours:
 
         # Calculate number of days worked in the period
         self.ndays_worked = hours_tt['Date'].nunique()
-
+        print(self.report23_general_taskplan)
         self.ttexported_general = self.ttexported_specific[self.report23_general_taskplan]
         self.ttexported_specific.pop(self.report23_general_taskplan)
 
@@ -249,6 +249,7 @@ class Hours:
 
         for row in hours_table.rows[1:]:
             #Change '.' to ',' in hours and transform to float
+            print(row.cells[5].text.strip())
             hours_task = float(row.cells[5].text.strip().replace(",", "."))
             key = str(row.cells[2].text.strip())
             #add line by line the hours in each task. 
@@ -300,7 +301,6 @@ class Hours:
                     self.report23_taskplan_dic[task] = hours
         self.report23_total = self.report23_general + self.report23_specific
         return"""
-
         
         while True and i < 10:
             # look for the line where task is reported
@@ -767,6 +767,7 @@ def check_months_header(document, header_data):
 
 def check_encryption(mr, header_data):
     dms = mr.tables[DMS_CELL["table"]].cell(*DMS_CELL["cell"]).text.strip()
+    version = header_data.version
     try:
         token = mr.tables[KEY_ENCRYPTED["table"]].cell(*KEY_ENCRYPTED["cell"]).text
     except IndexError:
@@ -776,7 +777,8 @@ def check_encryption(mr, header_data):
         return
     token = token.split('\n')[1][2:-1]
     dms_decoded = decode_token(token)
-    if dms != dms_decoded:
+    text_to_compare = dms + version
+    if text_to_compare != dms_decoded:
         error_message = f"  The DMS does not correspond to the encrypted key, the pre-processing tool " \
                         f"was not used."
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
