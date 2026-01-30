@@ -74,7 +74,7 @@ def process_mr_1639(mr_files, hours_timetell):
     global results_df
     results_df = pd.DataFrame(columns=["Reference", "Name", "Error"])
     #hours_task_plan = pd.read_excel(hours_task_plan, skiprows=3)
-    hours_timetell = pd.read_excel(hours_timetell)
+    hours_timetell = pd.read_excel(hours_timetell, sheet_name='Employees')
     #list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\OMF-1639 version\LIST OF EMPLOYEES 1639.xlsx")
     list_employees = pd.read_excel("LIST OF EMPLOYEES 1639.xlsx")
     #list_employees = list_employees[list_employees["Contract status"] == "Active"]
@@ -161,6 +161,7 @@ class PersonData:
         self.row_data = None
 
     def select_row(self, name_report):
+        
         if name_report == "Raul del Val":
             name_report = "Raul Del Val"
         print(unidecode(name_report))
@@ -338,6 +339,8 @@ class Hours:
 
     def _clean_timetell_df(self, df):
         """Cleans the dataframe imported from TimeTell export"""
+        if 'Activity Name' in df.columns:
+            df.rename(columns={'Activity Name': 'Activity name'}, inplace=True)
         # Drop columns not needed
         df.drop(columns=['Client name', 'Organization name', 'Info', 'Year', 'Month'], inplace=True, errors='ignore')
         #delete row if no name present
@@ -353,6 +356,9 @@ class Hours:
         df['Hours'] = df['Hours'].astype(float)
         df['Hours'] = df['Hours'].round(2)
         # Conditioning of columns
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['From time'] = pd.to_datetime(df['From time'], format='%H:%M:%S')
+        df['To time'] = pd.to_datetime(df['To time'], format='%H:%M:%S')
         df['Activity name'] = df['Activity name'].astype(str)
         df['From time'] = df['From time'].dt.round('min')
         df['To time'] = df['To time'].dt.round('min')
