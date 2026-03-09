@@ -748,7 +748,7 @@ def forbidden_words(document, header_data):
 
 
 def check_text_forbidden_words(text: str, header_data):
-    forbidden = ["F4E Project Manager", "F4E Manager", "F4E Line Manager", "Mindfulness", "Mission", "1159"]
+    forbidden = ["F4E Project Manager", "F4E Manager", "F4E Line Manager", "Mindfulness", " Mission ", "1159"]
     for word in forbidden:
         if word.lower() in text.lower():
             error_message = f"  The expression '{word}' appears in the body of the document, please delete it."
