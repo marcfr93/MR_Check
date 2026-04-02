@@ -191,14 +191,14 @@ class Hours:
         self.report23_general = None
         self.report23_specific = None
         self.report23_taskplan_dic = None
-        self.report23_general_taskplan = None
+        self.report23_general_taskplans = None
         self.ttexported_general = None
         self.ttexported_specific = None
         self.ndays_worked = None
     
     def hours_timetell_export(self, hours_ttexport, person_data, header_data):
         """Get hours from Excel file exported from TimeTell"""
-        self.ttexported_general = 0
+        self.ttexported_general = {}
         self.ttexported_specific = {}
         
         #format and clean dataframe
@@ -234,15 +234,21 @@ class Hours:
 
         # Calculate number of days worked in the period
         self.ndays_worked = hours_tt['Date'].nunique()
-        print(self.report23_general_taskplan)
-        self.ttexported_general = self.ttexported_specific[self.report23_general_taskplan]
-        self.ttexported_specific.pop(self.report23_general_taskplan)
+        
+        for task_code in self.report23_general_taskplan_dic.keys():
+            self.ttexported_general[task_code] = self.ttexported_specific[task_code]
+            self.ttexported_specific.pop(task_code)
+        #print(self.report23_general_taskplan)
+        #for task_code in self.report
+        #self.ttexported_general = self.ttexported_specific[self.report23_general_taskplan]
+        #self.ttexported_specific.pop(self.report23_general_taskplan)
 
         return False
 
     def hours_table_section_24(self, document):
         """Get hours from table in section 2.4 of the MR"""
         self.table24_general = 0
+        self.table24_general_dic = {}
         self.table24_specific = {}
         hours_table = document.tables[HOURS_TABLE["table"]].cell(*HOURS_TABLE["cell"]).tables[0]
 
@@ -256,13 +262,23 @@ class Hours:
             #add line by line the hours in each task. 
             if "Total".casefold() in row.cells[0].text.strip().casefold():
                 continue
-            if key == self.report23_general_taskplan:
+            if key in self.report23_general_taskplan_dic:
+                if key in self.table24_general_dic:
+                    self.table24_general_dic[key] += hours_task
+                else: 
+                    self.table24_general_dic[key] = hours_task
+            elif key in self.report23_taskplan_dic:
+                if key in self.table24_specific:
+                    self.table24_specific[key] += hours_task
+                else:
+                    self.table24_specific[key] = hours_task
+            """if key in self.report23_general_taskplan:
                 self.table24_general += hours_task
             elif key in self.table24_specific:
                 self.table24_specific[key] += hours_task
             else:
-                self.table24_specific[key] = hours_task
-        self.table24_total = self.table24_general + sum(self.table24_specific.values())
+                self.table24_specific[key] = hours_task"""
+        self.table24_total = sum(self.table24_general_dic.values()) + sum(self.table24_specific.values())
 
         return
 
@@ -271,6 +287,7 @@ class Hours:
         self.report23_general = 0
         self.report23_specific = 0
         self.report23_general_taskplan = ""
+        self.report23_general_taskplan_dic = {}
         self.report23_taskplan_dic = {}
         i = 0
         section = document.tables[CURRENT_MILESTONE["table"]].cell(*CURRENT_MILESTONE["cell"]).text
@@ -320,7 +337,8 @@ class Hours:
                 hours_task = float(hours_task)
                 if "General Activities".casefold() in line.casefold():
                     self.report23_general += hours_task
-                    self.report23_general_taskplan = line[line.find("(") + 1:line.find(")")]
+                    taskplan = line[line.find("(") + 1:line.find(")")]
+                    self.report23_general_taskplan_dic[taskplan] = hours_task
                 else:
                     self.report23_specific += hours_task
                     self.report23_taskplan_dic[line[line.find("(") + 1:line.find(")")]] = hours_task
@@ -540,10 +558,11 @@ def other_checks_hours(header_data, hours):
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
     
     #Check if general activities hours are more than 8%
-    general_activities_proportion = hours.table24_general / hours.table24_total * 100
+    general_activities_proportion = sum(hours.table24_general_dic.values()) / hours.table24_total * 100
     if general_activities_proportion > 8:
-        error_message = f"  The General Activities task {hours.report23_general_taskplan} took {float(hours.table24_general):.2f} hours, which is a " \
-                        f"{float(general_activities_proportion):.2f}% of the total: {hours.table24_total} hours"
+        """error_message = f"  The General Activities task {hours.report23_general_taskplan} took {float(hours.table24_general):.2f} hours, which is a " \
+                        f"{float(general_activities_proportion):.2f}% of the total: {hours.table24_total} hours"""
+        error_message = f"  The General Activities tasks took {float(sum(hours.table24_general_dic.values())):.2f} hoursm which is a {float(general_activities_proportion):.2f}% of the total: {hours.table24_total} hours"
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
 
@@ -570,12 +589,22 @@ def check_hours_report_vs_ttexport(header_data, hours):
     in section 2.4 of the report and the hours exported from Timetell"""
     
     # Check hours general task
-    if not almost_equal(hours.ttexported_general, hours.table24_general):
+    """if not almost_equal(hours.ttexported_general, hours.table24_general):
         error_message = f"  The General Activities task declared in section 2.4 ({hours.table24_general}) are not " \
                         f" coincident with those declared TimeTell({float(hours.ttexported_general):.2f}) "
         print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, 
-                                           name_report, error_message[2:]]
+                                           name_report, error_message[2:]]"""
+    for task_code in hours.table24_general_dic.keys():
+        if task_code not in hours.ttexported_general.keys():
+            hours.ttexported_general[task_code] = 0
+        if not almost_equal(hours.ttexported_general[task_code], hours.table24_general_dic[task_code]):
+            error_message = f"  The General Activities task declared in section 2.4 ({hours.table24_general_dic[task_code]}) are not " \
+                            f" coincident with those declared TimeTell({float(hours.ttexported_general[task_code]):.2f}) "
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, 
+                                            name_report, error_message[2:]]        
+
 
     # Check hours specific tasks
     for task_code in hours.table24_specific.keys():
@@ -595,14 +624,33 @@ def check_tasks_hours_report_vs_timetell(header_data, hours):
     coincident"""
 
     # Check the general activities task
-    float(hours.report23_general_taskplan)
+    """float(hours.report23_general_taskplan)
     if not almost_equal(hours.table24_general, hours.report23_general):
         error_message = f"  The General Activities task {hours.report23_general_taskplan} hours "\
                         f"declared in the table of section 2.4 ({float(hours.table24_general):.2f}) " \
                         f"are not coincident with the ones declared in section 2.3 " \
                         f"({float(hours.report23_general):.2f})"
         print(error_message)
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]"""
+    
+    for task_code in hours.report23_general_taskplan_dic.keys():
+        if task_code not in hours.table24_general_dic.keys():
+            hours.table24_general_dic[task_code] = 0
+        if not almost_equal(hours.table24_general_dic[task_code], hours.report23_general_taskplan_dic[task_code]):
+            error_message = f"  The Specific task {task_code} hours declared in the table"\
+                            f" of section 2.4 ({float(hours.table24_general_dic[task_code]):.2f}) "\
+                            f"are not coincident with the ones declared in section 2.3 " \
+                            f"({float(hours.report23_general_taskplan_dic[task_code]):.2f})"
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    for task_code in hours.table24_general_dic.keys():
+        if task_code not in hours.report23_general_taskplan_dic.keys():
+            error_message = f"  The hours of Specific Task {task_code} in TimeTell were " \
+                            f"declared in section 2.4 ({float(hours.table24_specific[task_code]):.2f}) but not " \
+                            f"in section 2.3 of the report."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+
 
     # Check the specific tasks
     for task_code in hours.report23_taskplan_dic.keys():
@@ -638,18 +686,33 @@ def check_codes_sections(header_data, section, document, cell_ref, hours):
         name (class): configurations of the person's name
         section (str): number of section in the document
     """
-    general_code, specific_codes = get_codes_activities_section(document, cell_ref)
-    if general_code is None:
+    general_codes, specific_codes = get_codes_activities_section(document, cell_ref)
+    """if general_code is None:
         error_message = f"  No General Activity code in section {section} could be found in the report. " \
                         f"Check if the format of the code is correct."
         print(error_message)    
-        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]   
     elif general_code != hours.report23_general_taskplan:
         error_message = f"  In section {section}, the General Activity code '{general_code}' cannot be found in " \
                         f"the Task Plan Hours. Either the format of the code is not correct or the number of the " \
                         f"activity code is not correct."
         print(error_message)
+        results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]"""
+    
+    if len(general_codes) == 0:
+        error_message = f"  No General Activity code in section {section} could be found in the report. " \
+                        f"Check if the format of the code is correct."
+        print(error_message)
         results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    for code in general_codes:
+        if not code in hours.table24_general_dic.keys():
+            error_message = f"  In section {section}, the Specific Activity code '{code}' cannot be found in the " \
+                            f"Task Plan Hours. Either the format of the code is not correct or the number of the" \
+                            f"activity code is not correct."
+            print(error_message)
+            results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
+    
+    
     if len(specific_codes) == 0:
         error_message = f"  No Specific Activity code in section {section} could be found in the report. " \
                         f"Check if the format of the code is correct."
@@ -678,7 +741,7 @@ def get_codes_activities_section(document, cell_ref):
         str: code of the general task
         list: with the codes of the specific tasks
     """
-    general_taskplan_code = None
+    general_taskplan_codes = []
     specific_taskplans_codes = []
     # Trim the text to only the wanted part
     section = document.tables[cell_ref["table"]].cell(*cell_ref["cell"]).text
@@ -691,11 +754,12 @@ def get_codes_activities_section(document, cell_ref):
             break
         line = match.group(0)
         if "General Activities".casefold() in line.casefold():
-            general_taskplan_code = line[line.find("(") + 1:line.find(")")]
+            #general_taskplan_code = line[line.find("(") + 1:line.find(")")]
+            general_taskplan_codes = general_taskplan_codes + [line[line.find("(") + 1:line.find(")")]]
         else:
             specific_taskplans_codes = specific_taskplans_codes + [line[line.find("(") + 1:line.find(")")]]
 
-    return general_taskplan_code, specific_taskplans_codes
+    return general_taskplan_codes, specific_taskplans_codes
 
 
 def check_dates_section3(document, header_data):
