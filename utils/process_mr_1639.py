@@ -235,9 +235,15 @@ class Hours:
         # Calculate number of days worked in the period
         self.ndays_worked = hours_tt['Date'].nunique()
         
+        #for task_code in self.report23_general_taskplan_dic.keys():
+        print(self.ttexported_specific)
         for task_code in self.report23_general_taskplan_dic.keys():
-            self.ttexported_general[task_code] = self.ttexported_specific[task_code]
-            self.ttexported_specific.pop(task_code)
+            print(task_code)
+            try:
+                self.ttexported_general[task_code] = self.ttexported_specific[task_code]
+                self.ttexported_specific.pop(task_code)
+            except KeyError:
+                pass
         #print(self.report23_general_taskplan)
         #for task_code in self.report
         #self.ttexported_general = self.ttexported_specific[self.report23_general_taskplan]
