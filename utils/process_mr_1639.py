@@ -175,6 +175,7 @@ class PersonData:
         self.name_monthly = unidecode(self.row_data["Employee"].values[0])
         self.name_irs = unidecode(self.row_data["Employee"].values[0])
         self.name_atg = unidecode(self.row_data["ATG Account Name"].values[0])
+        self.name_timetell = unidecode(self.row_data["Time Tell Name"].values[0])
         return
     
     def get_dms(self, month, year):
@@ -211,13 +212,13 @@ class Hours:
         
         #create new column changing name format
         hours_ttexport['name_tt'] = hours_ttexport["Employee name"].str.split(",").str[1].str[1:] + " " + hours_ttexport["Employee name"].str.split(",").str[0]
-        print(person_data.name_atg)
-        #filter by name
-        hours_tt = hours_ttexport[hours_ttexport["name_tt"].astype(str).apply(unidecode) == person_data.name_atg]
+        
+        #filter by name        
+        hours_tt = hours_ttexport[(hours_ttexport["name_tt"].fillna('').astype(str).apply(unidecode) == person_data.name_atg) | (hours_ttexport["name_tt"].fillna('').astype(str).apply(unidecode) == person_data.name_timetell)]
         
         #create error if no hours
         if len(hours_tt) == 0:
-            error_message = f"  The name '{person_data.name_atg}' could not be found in the TimeTell export file and, consequently, the hours " \
+            error_message = f"  The name '{person_data.name_timetell}' could not be found in the TimeTell export file and, consequently, the hours " \
                             f"couldn't be checked"
             print(error_message)
             results_df.loc[len(results_df)] = [header_data.f4e_reference, name_report, error_message[2:]]
