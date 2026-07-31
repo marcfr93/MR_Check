@@ -77,6 +77,7 @@ def process_mr_1639(mr_files, hours_timetell):
     hours_timetell = pd.read_excel(hours_timetell, sheet_name='Employees')
     #list_employees = pd.read_excel(r"D:\DATA\ferrmar\Documents\04-ATG\automatic_monthly_check\OMF-1639 version\LIST OF EMPLOYEES 1639.xlsx")
     list_employees = pd.read_excel("LIST OF EMPLOYEES 1639.xlsx")
+    list_employees = list_employees[list_employees["Status"] == "Active"]
     #list_employees = list_employees[list_employees["Contract status"] == "Active"]
     for report in mr_files:
         process_monthly(report, list_employees, hours_timetell)
@@ -165,13 +166,14 @@ class PersonData:
         if name_report == "Raul del Val":
             name_report = "Raul Del Val"
         print(unidecode(name_report))
+        print(self.df)
         self.row_data = self.df[self.df["Employee"].astype(str).apply(unidecode).str.lower() == unidecode(name_report).lower()]
         self.define_data()
         return
     
     def define_data(self):
         self.contract = self.row_data["Specific Contract"].values[0].strip()
-        self.kom = self.row_data["Kick-Off Meeting"].values[0]
+        self.kom = self.row_data["Specific Contract F4E KoM"].values[0]
         self.name_monthly = unidecode(self.row_data["Employee"].values[0])
         self.name_irs = unidecode(self.row_data["Employee"].values[0])
         self.name_atg = unidecode(self.row_data["ATG Account Name"].values[0])
@@ -931,28 +933,34 @@ def no_errors_message(header_data) -> None:
 
 
 def process_monthly(filename, list_employees, hours_ttexport):
-    # Read list of employees
-    
+
     global name_report
 
     #1 Get data from the filename
     f4e_contract, name_report = get_data_from_filename(filename)
+
     #2 Open document and accept all changes
     document = docx.Document(filename)
     accept_all_changes(document)
+
     #3 Get data from header of the report
     header_data = read_header(document)
     person_data = PersonData(list_employees)
     person_data.select_row(name_report)
+
     #4 Get hours
     hours, hours_flag = get_all_hours(document, header_data, person_data, hours_ttexport)
+    
     #5 Header checks
     header_checks(filename, header_data, f4e_contract, person_data)
+
     #6 Hours checks
     if not hours_flag:
         hours_checks(header_data, hours)
+
     #7 Other checks
     other_checks(document, header_data, hours)
+
     # If no error message, add note saying everything is ok
     no_errors_message(header_data)
 
