@@ -390,6 +390,7 @@ class Hours:
         df['From time'] = df['From time'].dt.round('min')
         df['To time'] = df['To time'].dt.round('min')
         # Delete word 'Task: ' from activity name
+        df = df[~df['Activity name'].str.contains('Big Science')]
         df['Activity name'] = df['Activity name'].astype(str).str.replace('Task: ', '', regex=False)
         df['Activity name'] = df['Activity name'].astype(float).astype(int).astype(str)
         return df
